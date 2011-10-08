@@ -21,12 +21,12 @@ class TestSemiDBM(unittest.TestCase):
         return semidbm.open(os.path.join(self.tempdir,
                                          'myfile.db'), 'c')
 
-    def testInsertThenRetrieve(self):
+    def test_insert_then_retrieve(self):
         db = self.open_db_file()
         db['foo'] = 'bar'
         self.assertEqual(db['foo'], 'bar')
 
-    def testInsertCloseRetrieve(self):
+    def test_insert_close_retrieve(self):
         # This will verify loading the index.
         db = self.open_db_file()
         db['foo'] = 'bar'
@@ -34,6 +34,15 @@ class TestSemiDBM(unittest.TestCase):
 
         db2 = self.open_db_file()
         self.assertEqual(db2['foo'], 'bar')
+
+    def test_insert_multiple(self):
+        db = self.open_db_file()
+        db['one'] = '1'
+        db['two'] = '2'
+        db['three'] = '3'
+        self.assertEqual(db['one'], '1')
+        self.assertEqual(db['two'], '2')
+        self.assertEqual(db['three'], '3')
 
 
 if __name__ == '__main__':

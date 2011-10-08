@@ -18,6 +18,9 @@ class _SemiDBM(object):
         self._data_filename = filename
         self._index_filename = filename + os.extsep + 'idx'
         self._index = self._load_index(self._index_filename)
+        # buffering=0 makes the file objects unbuffered.
+        self._index_file = _open(self._index_filename, 'ab', buffering=0)
+        self._data_file = _open(self._data_filename, 'ab+', buffering=0)
 
     def _load_index(self, filename):
         if not os.path.exists(filename):
@@ -52,9 +55,10 @@ class _SemiDBM(object):
 
     def __getitem__(self, key):
         offset, size = self._index[key]
-        f = _open(self._data_filename, 'r')
-        f.seek(offset)
-        return f.read(size)
+        self._data_file.seek(offset)
+        data = self._data_file.read(size)
+        self._data_file.seek(0, 2)
+        return data
 
     def __setitem__(self, key, value):
         offset = self._write_to_data_file(value)
@@ -64,25 +68,21 @@ class _SemiDBM(object):
     def _add_item_to_index(self, key, offset, value_length):
         self._index[key] = (offset, value_length)
         # Also write out the data immediately to the index.
-        f = _open(self._index_filename, 'ab')
-        f.write('%s:%s%s:%s%s:%s' % (
+        self._index_file.write('%s:%s%s:%s%s:%s' % (
             len(str(key)), key, len(str(offset)), offset,
             len(str(value_length)), value_length))
-        f.close()
 
     def _write_to_data_file(self, value):
         # Write the new data out at the end of the file.
         # Returns the offset of where this data is located
         # in the file.
-        f = _open(self._data_filename, 'ab')
-        f.seek(0, 2)
-        offset = f.tell()
-        f.write(value)
-        f.close()
+        offset = self._data_file.tell()
+        self._data_file.write(value)
         return offset
 
     def close(self):
-        pass
+        self._index_file.close()
+        self._data_file.close()
 
 
 def open(filename, flag=None, mode=0666):
