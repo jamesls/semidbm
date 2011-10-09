@@ -9,7 +9,6 @@ dumbdbm currently has.
 import os
 import __builtin__
 
-_BUFSIZE = 4096
 _open = __builtin__.open
 _DELETED = -1
 
