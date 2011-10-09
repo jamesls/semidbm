@@ -11,6 +11,7 @@ import __builtin__
 
 _BUFSIZE = 4096
 _open = __builtin__.open
+_DELETED = -1
 
 
 class _SemiDBM(object):
@@ -30,7 +31,13 @@ class _SemiDBM(object):
         start = 0
         items = self._items_in_index(contents)
         for key_name, offset, size in self._read_index(contents):
-            index[key_name] = (int(offset), int(size))
+            if int(size) == _DELETED:
+                # This is a deleted item so we need to make sure
+                # that this value is not in the index.
+                if key_name in index:
+                    del index[key_name]
+            else:
+                index[key_name] = (int(offset), int(size))
         return index
 
     def _read_index(self, contents):
@@ -79,6 +86,14 @@ class _SemiDBM(object):
         offset = self._data_file.tell()
         self._data_file.write(value)
         return offset
+
+    def __contains__(self, key):
+        return key in self._index
+
+    def __delitem__(self, key):
+        offset, value = self._index[key]
+        self._add_item_to_index(key, offset, _DELETED)
+        del self._index[key]
 
     def close(self):
         self._index_file.close()
