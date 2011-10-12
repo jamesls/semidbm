@@ -10,7 +10,7 @@ import random
 random.seed(100)
 
 
-_potential_dbms = ['hashdb', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
+_potential_dbms = ['dbhash', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
 DBMS = []
 TEMPDIR = tempfile.mkdtemp(prefix='dbmprofile')
 
