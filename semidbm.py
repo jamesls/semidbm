@@ -13,6 +13,20 @@ _open = __builtin__.open
 _DELETED = -1
 
 
+# This basically works by keeping two files, one that only contains the data of
+# the values associated with keys, and one which stores the offsets in the
+# data file for the keys.  To add a new value to the db, the value is written
+# to the data file and the index file is appended with the key name, the offset
+# into the data file where the associated data was written, and the size of the
+# value.  The format of the index is a very simple format: <size>:<item> where
+# <size> is the length of  the item, and <item> is either the key, the offset, or
+# the size of the value.  For example, adding a new entry in the index might
+# look like this:
+# 3:foo3:1242:12
+# This will be read in as the tuple ('foo', '124', '12') which is interpreted
+# as the value for the key 'foo' is located 124 bytes into the data file and is
+# 12 bytes long.
+
 class _SemiDBM(object):
     def __init__(self, filename):
         self._data_filename = filename
@@ -23,6 +37,8 @@ class _SemiDBM(object):
         self._data_file = _open(self._data_filename, 'ab+', buffering=0)
 
     def _load_index(self, filename):
+        # This method is only used upon instantiation to populate
+        # the in memory index.
         if not os.path.exists(filename):
             return {}
         contents = _open(filename, 'r').read()
@@ -32,14 +48,22 @@ class _SemiDBM(object):
         for key_name, offset, size in self._read_index(contents):
             if int(size) == _DELETED:
                 # This is a deleted item so we need to make sure
-                # that this value is not in the index.
-                if key_name in index:
-                    del index[key_name]
+                # that this value is not in the index.  We know
+                # that the key is already in the index, because
+                # a delete is only written to the index if the
+                # key already exists in the db.
+                del index[key_name]
             else:
                 index[key_name] = (int(offset), int(size))
         return index
 
     def _read_index(self, contents):
+        # contents is the raw contents of the index file.
+        # This method will read in the contents of the index
+        # file and will yield the items in the index in groups
+        # of three.  This makes is easier for the calling code
+        # to process the items, because one entry requires
+        # three items in the index (name, offset, size).
         items = []
         for item in self._items_in_index(contents):
             items.append(item)
@@ -72,11 +96,10 @@ class _SemiDBM(object):
         self._add_item_to_index(key, offset, value_length)
 
     def _add_item_to_index(self, key, offset, value_length):
-        self._index[key] = (offset, value_length)
-        # Also write out the data immediately to the index.
         self._index_file.write('%s:%s%s:%s%s:%s' % (
             len(str(key)), key, len(str(offset)), offset,
             len(str(value_length)), value_length))
+        self._index[key] = (offset, value_length)
 
     def _write_to_data_file(self, value):
         # Write the new data out at the end of the file.
