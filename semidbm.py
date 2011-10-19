@@ -19,10 +19,10 @@ _DELETED = -1
 # to the data file and the index file is appended with the key name, the offset
 # into the data file where the associated data was written, and the size of the
 # value.  The format of the index is a very simple format: <size>:<item> where
-# <size> is the length of  the item, and <item> is either the key, the offset, or
+# <size> is the length of the item, and <item> is either the key, the offset, or
 # the size of the value.  For example, adding a new entry in the index might
 # look like this:
-# 3:foo3:1242:12
+# 3:foo3:1242:12\n
 # This will be read in as the tuple ('foo', '124', '12') which is interpreted
 # as the value for the key 'foo' is located 124 bytes into the data file and is
 # 12 bytes long.
@@ -41,10 +41,9 @@ class _SemiDBM(object):
         # the in memory index.
         if not os.path.exists(filename):
             return {}
-        contents = _open(filename, 'r').read()
+        contents = _open(filename, 'r')
         index = {}
         start = 0
-        items = self._items_in_index(contents)
         for key_name, offset, size in self._read_index(contents):
             if int(size) == _DELETED:
                 # This is a deleted item so we need to make sure
@@ -58,30 +57,15 @@ class _SemiDBM(object):
         return index
 
     def _read_index(self, contents):
-        # contents is the raw contents of the index file.
-        # This method will read in the contents of the index
-        # file and will yield the items in the index in groups
-        # of three.  This makes is easier for the calling code
-        # to process the items, because one entry requires
-        # three items in the index (name, offset, size).
-        items = []
-        for item in self._items_in_index(contents):
-            items.append(item)
-            # Only yield in groups of three.  The index is
-            # formatted such that one entry has three elements:
-            # keyname, offset in the file, size of the value.
-            if len(items) == 3:
-                yield items
-                items = []
-
-    def _items_in_index(self, contents):
-        start = 0
-        length = len(contents)
-        while start < length:
-            end = contents.find(':', start)
-            item_length = int(contents[start:end])
-            yield contents[end + 1:end + item_length + 1]
-            start = end + item_length + 1
+        for line in contents:
+            start = 0
+            items = []
+            for i in xrange(3):
+                end = line.find(':', start)
+                item_length = int(line[start:end])
+                items.append(line[end + 1:end + item_length + 1])
+                start = end + item_length + 1
+            yield items
 
     def __getitem__(self, key):
         offset, size = self._index[key]
@@ -96,7 +80,7 @@ class _SemiDBM(object):
         self._add_item_to_index(key, offset, value_length)
 
     def _add_item_to_index(self, key, offset, value_length):
-        self._index_file.write('%s:%s%s:%s%s:%s' % (
+        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
             len(str(key)), key, len(str(offset)), offset,
             len(str(value_length)), value_length))
         self._index[key] = (offset, value_length)
