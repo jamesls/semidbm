@@ -3,6 +3,7 @@
 
 """
 import os
+import optparse
 import time
 import tempfile
 import random
@@ -15,12 +16,14 @@ DBMS = []
 TEMPDIR = tempfile.mkdtemp(prefix='dbmprofile')
 
 
-for potential in _potential_dbms:
-    try:
-        d = __import__(potential)
-        DBMS.append(d)
-    except ImportError:
-        continue
+def set_dbms(dbms):
+    DBMS[:] = []
+    for potential in dbms:
+        try:
+            d = __import__(potential)
+            DBMS.append(d)
+        except ImportError:
+            continue
 
 
 def print_time(f):
@@ -131,6 +134,13 @@ def load_twice(dbm):
 
 
 def main():
+    parser = optparse.OptionParser()
+    parser.add_option('--dbm', dest='dbms', action='append')
+    opts, args = parser.parse_args()
+    if opts.dbms:
+        set_dbms(opts.dbms)
+    else:
+        set_dbms(_potential_dbms)
     # These generate the same amount of value data,
     # but one is 401 keys with 512 byte sizes and the
     # other is 512 keys with 401 byte sizes.
