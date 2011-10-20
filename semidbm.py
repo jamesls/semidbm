@@ -28,15 +28,15 @@ _DELETED = -1
 # 12 bytes long.
 
 class _SemiDBM(object):
-    def __init__(self, filename):
+    def __init__(self, filename, compact_on_open=True):
         self._data_filename = filename
         self._index_filename = filename + os.extsep + 'idx'
-        self._index = self._load_index(self._index_filename)
+        self._index = self._load_index(self._index_filename, compact_on_open)
         # buffering=0 makes the file objects unbuffered.
         self._index_file = _open(self._index_filename, 'ab', buffering=0)
         self._data_file = _open(self._data_filename, 'ab+', buffering=0)
 
-    def _load_index(self, filename):
+    def _load_index(self, filename, compact_on_open):
         # This method is only used upon instantiation to populate
         # the in memory index.
         if not os.path.exists(filename):
@@ -44,6 +44,7 @@ class _SemiDBM(object):
         contents = _open(filename, 'r')
         index = {}
         start = 0
+        needs_compaction = False
         for key_name, offset, size in self._read_index(contents):
             if int(size) == _DELETED:
                 # This is a deleted item so we need to make sure
@@ -52,9 +53,29 @@ class _SemiDBM(object):
                 # a delete is only written to the index if the
                 # key already exists in the db.
                 del index[key_name]
+                needs_compaction = True
             else:
+                if key_name in index:
+                    needs_compaction = True
                 index[key_name] = (int(offset), int(size))
+        if compact_on_open and needs_compaction:
+            self._compact_index(index)
         return index
+
+    def _compact_index(self, index):
+        new_index_filename = self._index_filename + os.extsep + 'new'
+        # Should probably account for if the file already exists.
+        f = _open(new_index_filename, 'w')
+        for key in index:
+            offset, value_length = index[key]
+            self._write_index_entry(f, key, offset, value_length)
+        f.close()
+        os.rename(new_index_filename, self._index_filename)
+
+    def _write_index_entry(self, fileobj, key, offset, value_length):
+        fileobj.write('%s:%s%s:%s%s:%s\n' % (
+            len(str(key)), key, len(str(offset)), offset,
+            len(str(value_length)), value_length))
 
     def _read_index(self, contents):
         for line in contents:
@@ -80,9 +101,8 @@ class _SemiDBM(object):
         self._add_item_to_index(key, offset, value_length)
 
     def _add_item_to_index(self, key, offset, value_length):
-        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
-            len(str(key)), key, len(str(offset)), offset,
-            len(str(value_length)), value_length))
+        self._write_index_entry(self._index_file, key, offset,
+                                value_length)
         self._index[key] = (offset, value_length)
 
     def _write_to_data_file(self, value):

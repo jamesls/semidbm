@@ -97,6 +97,31 @@ class TestSemiDBM(unittest.TestCase):
         self.assertTrue('foo' not in db2)
         self.assertEqual(db2['bar'], 'bar')
 
+    def test_compaction_of_index_file_on_open_deletes(self):
+        db = self.open_db_file()
+        for i in xrange(10):
+            db[str(i)] = str(i)
+        for i in xrange(10):
+            del db[str(i)]
+        db.close()
+        db2 = self.open_db_file()
+        self.assertEqual(os.stat(db2._index_filename).st_size, 0)
+
+    def test_compaction_of_index_file_on_open_updates(self):
+        # This is definitely implementation specific, but
+        # I can't think of a better way to validate
+        # update compaction in the index file.
+        db = self.open_db_file()
+        for i in xrange(10):
+            db[str(i)] = str(i)
+            db[str(i)] = str(i + 1)
+            db[str(i)] = str(i + 2)
+        # With 3 updates per key, the index file is 30 lines long.
+        # On compaction, the index file should only be 10 minutes long.
+        db.close()
+        db2 = self.open_db_file()
+        self.assertEqual(len(open(db2._index_filename).readlines()), 10)
+
 
 if __name__ == '__main__':
     unittest.main()
