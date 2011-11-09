@@ -121,6 +121,13 @@ class _SemiDBM(object):
         self._add_item_to_index(key, offset, _DELETED)
         del self._index[key]
 
+    def __iter__(self):
+        for key in self._index:
+            yield key
+
+    def keys(self):
+        return self._index.keys()
+
     def close(self):
         self._index_file.close()
         self._data_file.close()

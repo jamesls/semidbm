@@ -122,6 +122,20 @@ class TestSemiDBM(unittest.TestCase):
         db2 = self.open_db_file()
         self.assertEqual(len(open(db2._index_filename).readlines()), 10)
 
+    def test_keys_method(self):
+        db = self.open_db_file()
+        db['one'] = 'bar'
+        db['two'] = 'bar'
+        db['three'] = 'bar'
+        self.assertEqual(set(db.keys()), set(['one', 'two', 'three']))
+
+    def test_iterate(self):
+        db = self.open_db_file()
+        db['one'] = 'foo'
+        db['two'] = 'bar'
+        db['three'] = 'baz'
+        self.assertEqual(set(db), set(['one', 'two', 'three']))
+
 
 if __name__ == '__main__':
     unittest.main()
