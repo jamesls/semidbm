@@ -136,6 +136,46 @@ class TestSemiDBM(unittest.TestCase):
         db['three'] = 'baz'
         self.assertEqual(set(db), set(['one', 'two', 'three']))
 
+    def test_compaction_of_data_file_on_open_deletes(self):
+        db = self.open_db_file()
+        db['key'] = 'original'
+        db['key'] = 'updated'
+        del db['key']
+        db.compact()
+        db.close()
+        self.assertEqual(len(open(db._data_filename).read()), 0)
+
+    def test_compact_and_retrieve_data(self):
+        db = self.open_db_file()
+        db['one'] = 'foo'
+        db['key'] = 'original'
+        db['two'] = 'bar'
+        db['key'] = 'updated'
+        del db['key']
+        db['three'] = 'baz'
+        db.compact()
+        self.assertEqual(db['one'], 'foo')
+        self.assertEqual(db['two'], 'bar')
+        self.assertEqual(db['three'], 'baz')
+
+    def test_compact_on_close(self):
+        db = self.open_db_file()
+        db['key'] = 'original'
+        del db['key']
+        db.close(compact=True)
+        self.assertEqual(len(open(db._data_filename).read()), 0)
+
+    def test_compact_then_write_data(self):
+        db = self.open_db_file()
+        db['before'] = 'before'
+        del db['before']
+        db.compact()
+        db['after'] = 'after'
+        db.close()
+
+        db2 = self.open_db_file()
+        self.assertEqual(db2['after'], 'after')
+
 
 if __name__ == '__main__':
     unittest.main()
