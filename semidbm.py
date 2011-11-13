@@ -33,6 +33,9 @@ class _SemiDBM(object):
     def __init__(self, filename, compact_on_open=True):
         self._data_filename = filename
         self._index_filename = filename + os.extsep + 'idx'
+        self._index = None
+        self._index_file = None
+        self._data_file = None
         self._load_db(compact_on_open)
 
     def _load_db(self, compact_index):
