@@ -50,12 +50,11 @@ class _SemiDBM(object):
         if not os.path.exists(filename):
             return {}
         contents = _open(filename, 'r')
-        return self._load_context_from_fileobj(contents, compact_on_open)
+        return self._load_index_from_fileobj(contents, compact_on_open)
 
-    def _load_context_from_fileobj(self, contents, compact_on_open):
+    def _load_index_from_fileobj(self, contents, compact_on_open):
         index = {}
         needs_compaction = False
-        total_data_size = 0
         for key_name, offset, size in self._read_index(contents):
             size = int(size)
             offset = int(offset)
@@ -64,7 +63,6 @@ class _SemiDBM(object):
                 # value is not in the index.  We know that the key is already
                 # in the index, because a delete is only written to the index
                 # if the key already exists in the db.
-                total_data_size -= index[key_name][1]
                 del index[key_name]
                 needs_compaction = True
             else:
@@ -73,7 +71,6 @@ class _SemiDBM(object):
                     index[key_name] = (offset, size)
                 else:
                     index[key_name] = (offset, size)
-                    total_data_size += size
         if compact_on_open and needs_compaction:
             self._compact_index(index)
         return index
@@ -133,7 +130,7 @@ class _SemiDBM(object):
         return key in self._index
 
     def __delitem__(self, key):
-        offset, value = self._index[key]
+        offset = self._index[key][0]
         self._add_item_to_index(key, offset, _DELETED)
         del self._index[key]
 
