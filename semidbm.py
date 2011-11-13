@@ -51,7 +51,6 @@ class _SemiDBM(object):
 
     def _load_context_from_fileobj(self, contents, compact_on_open):
         index = {}
-        start = 0
         needs_compaction = False
         total_data_size = 0
         for key_name, offset, size in self._read_index(contents):
