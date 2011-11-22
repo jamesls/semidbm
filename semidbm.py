@@ -13,6 +13,10 @@ _open = __builtin__.open
 _DELETED = -1
 
 
+class DBMLoadError(Exception):
+    pass
+
+
 # This basically works by keeping two files, one (the data file) that only
 # contains the data of the values associated with keys, and one (the index
 # file) which stores the offsets in the data file for the keys.  To add a new
@@ -50,7 +54,10 @@ class _SemiDBM(object):
         if not os.path.exists(filename):
             return {}
         contents = _open(filename, 'r')
-        return self._load_index_from_fileobj(contents, compact_on_open)
+        try:
+            return self._load_index_from_fileobj(contents, compact_on_open)
+        except ValueError:
+            raise DBMLoadError("Bad index file: %s" % filename)
 
     def _load_index_from_fileobj(self, contents, compact_on_open):
         index = {}

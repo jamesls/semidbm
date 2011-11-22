@@ -176,6 +176,27 @@ class TestSemiDBM(unittest.TestCase):
         db2 = self.open_db_file()
         self.assertEqual(db2['after'], 'after')
 
+    def test_loading_error_bad_format(self):
+        filename = os.path.join(self.tempdir, 'bad.db')
+        with open(filename + '.idx', 'w') as f:
+            f.write("bad index file")
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+
+    def test_loading_error_bad_line(self):
+        filename = os.path.join(self.tempdir, 'bad.db')
+        with open(filename + '.idx', 'w') as f:
+            # The first number should be 3 not 4, so
+            # a DBMLoadError is expected.
+            f.write("4:foo3:1242:12\n")
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+
+    def test_loading_error_missing_fields(self):
+        filename = os.path.join(self.tempdir, 'bad.db')
+        with open(filename + '.idx', 'w') as f:
+            # Missing the size attribute (the third value of the line).
+            f.write("4:foo3:124\n4:bar3:189\n")
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+
 
 if __name__ == '__main__':
     unittest.main()
