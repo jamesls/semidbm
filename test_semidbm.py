@@ -197,6 +197,15 @@ class TestSemiDBM(unittest.TestCase):
             f.write("4:foo3:124\n4:bar3:189\n")
         self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
 
+    def test_sync_contents(self):
+        # So there's not really a good way to test this, so
+        # I'm just making sure you can call it, and you can see the data.
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.sync()
+        db2 = self.open_db_file()
+        self.assertEqual(db2['foo'], 'bar')
+
 
 if __name__ == '__main__':
     unittest.main()

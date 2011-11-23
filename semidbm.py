@@ -89,6 +89,8 @@ class _SemiDBM(object):
         for key in index:
             offset, value_length = index[key]
             self._write_index_entry(f, key, offset, value_length)
+        f.flush()
+        os.fsync(f.fileno())
         f.close()
         os.rename(new_index_filename, self._index_filename)
 
@@ -151,8 +153,17 @@ class _SemiDBM(object):
     def close(self, compact=False):
         if compact:
             self.compact()
+        self.sync()
         self._index_file.close()
         self._data_file.close()
+
+    def sync(self):
+        # The files are opened unbuffered so we don't technically
+        # need to flush the file objects.
+        self._data_file.flush()
+        self._index_file.flush()
+        os.fsync(self._data_file.fileno())
+        os.fsync(self._index_file.fileno())
 
     def compact(self):
         """Compact the db to reduce space.
@@ -169,14 +180,12 @@ class _SemiDBM(object):
         the db is opened, but not the data file.
 
         """
-        # I'm really on the fence on this one.  It's adding a method
-        # that is not compliant with the interface the other dbms support.
-        # On the other hand, I think compaction is too useful
-        # of a feature to skip for the sake of LSP adherence.  It's also
-        # too expensive to do everytime you open the db (because the
-        # compaction touches the data associated with all of your keys).
-        # So it's here as part of the public API so that the user can
-        # decide whether or not they want to use it.
+        # Basically, compaction works by opening a new db, writing
+        # all the keys from this db to the new db, renaming the
+        # new db to the filenames associated with this db, and
+        # reopening the files associated with this db.  This
+        # implementation can certainly be more efficient, but compaction
+        # is really slow anyways.
         new_db = self.__class__(self._data_filename + os.extsep + 'compact')
         for key in self._index:
             new_db[key] = self[key]
