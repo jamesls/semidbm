@@ -51,3 +51,16 @@ Limitations
 * Not thread safe; can't be accessed by multiple processes.
 * No support for opening in read only mode.
 * The entire index must fit in memory.
+
+
+Changelog
+---------
+
+0.2.0
+~~~~~
+
+* New ``sync()`` method to ensure data is written to disk.
+
+  * ``sync()`` is called during compaction and on ``close()``.
+
+* Add a ``DBMLoadError`` exception for catching semidbm loading errors.
