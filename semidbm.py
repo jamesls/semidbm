@@ -13,7 +13,11 @@ _open = __builtin__.open
 _DELETED = -1
 
 
-class DBMLoadError(Exception):
+class DBMError(Exception):
+    pass
+
+
+class DBMLoadError(DBMError):
     pass
 
 
@@ -196,5 +200,29 @@ class _SemiDBM(object):
         self._load_db(compact_index=False)
 
 
-def open(filename, flag=None, mode=0666):
-    return _SemiDBM(filename)
+class _SemiDBMReadOnly(_SemiDBM):
+    def __delitem__(self, key):
+        self._method_not_allowed('delitem')
+
+    def __setitem__(self, key, value):
+        self._method_not_allowed('setitem')
+
+    def sync(self):
+        self._method_not_allowed('sync')
+
+    def compact(self):
+        self._method_not_allowed('compact')
+
+    def _method_not_allowed(self, method_name):
+        raise DBMError("Can't %s: db opened in read only mode." % method_name)
+
+    def close(self, compact=False):
+        self._index_file.close()
+        self._data_file.close()
+
+
+def open(filename, flag='r', mode=0666):
+    if flag == 'r':
+        return _SemiDBMReadOnly(filename)
+    elif flag == 'c':
+        return _SemiDBM(filename)

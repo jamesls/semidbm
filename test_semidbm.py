@@ -8,7 +8,7 @@ import StringIO
 import semidbm
 
 
-class TestSemiDBM(unittest.TestCase):
+class SemiDBMTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp(prefix='semidbm_ut')
 
@@ -21,6 +21,7 @@ class TestSemiDBM(unittest.TestCase):
         return semidbm.open(os.path.join(self.tempdir,
                                          'myfile.db'), 'c')
 
+class TestSemiDBM(SemiDBMTest):
     def test_insert_then_retrieve(self):
         db = self.open_db_file()
         db['foo'] = 'bar'
@@ -205,6 +206,38 @@ class TestSemiDBM(unittest.TestCase):
         db.sync()
         db2 = self.open_db_file()
         self.assertEqual(db2['foo'], 'bar')
+
+
+class TestReadOnlyMode(SemiDBMTest):
+    def open_db_file(self):
+        return semidbm.open(os.path.join(self.tempdir,
+                                         'myfile.db'), 'r')
+
+    def test_cant_setitem(self):
+        db = self.open_db_file()
+        self.assertRaises(semidbm.DBMError, db.__setitem__, 'foo', 'bar')
+
+    def test_cant_sync(self):
+        db = self.open_db_file()
+        self.assertRaises(semidbm.DBMError, db.sync)
+
+    def test_cant_compact(self):
+        db = self.open_db_file()
+        self.assertRaises(semidbm.DBMError, db.compact)
+
+    def test_cant_delitem(self):
+        db = self.open_db_file()
+        self.assertRaises(semidbm.DBMError, db.__delitem__, 'foo')
+
+    def test_close_never_compacts_index(self):
+        db = self.open_db_file()
+        db.calls = []
+        db.compact = lambda: db.calls.append('compact')
+        db.sync = lambda: db.calls.append('sync')
+
+        db.close(compact=True)
+
+        self.assertEqual(db.calls, [])
 
 
 if __name__ == '__main__':

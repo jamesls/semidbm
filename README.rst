@@ -45,11 +45,19 @@ distributed with the source that will give you an idea of the performance
 differences between the various dbms (it will benchmark any dbm from the stdlib
 you have installed you can compare against dbm, gdbm, Berkeley DB, etc.)
 
+Modes
+=====
+
+You can open semidbm in these modes:
+
+* ``r`` - Open dbm for reading only (default)
+* ``c`` - Open dbm for read/write, creating it if it doesn't exist.
+
+
 Limitations
 ===========
 
 * Not thread safe; can't be accessed by multiple processes.
-* No support for opening in read only mode.
 * The entire index must fit in memory.
 
 
