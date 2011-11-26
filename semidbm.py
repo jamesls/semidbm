@@ -221,8 +221,20 @@ class _SemiDBMReadOnly(_SemiDBM):
         self._data_file.close()
 
 
+class _SemiDBMReadWrite(_SemiDBM):
+    def _load_db(self, compact_index):
+        if not os.path.isfile(self._index_filename):
+            raise DBMError("Not a file: %s" % self._index_filename)
+        if not os.path.isfile(self._data_filename):
+            raise DBMError("Not a file: %s" % self._data_filename)
+
+        super(_SemiDBMReadWrite, self)._load_db(compact_index)
+
+
 def open(filename, flag='r', mode=0666):
     if flag == 'r':
         return _SemiDBMReadOnly(filename)
     elif flag == 'c':
         return _SemiDBM(filename)
+    elif flag == 'w':
+        return _SemiDBMReadWrite(filename)

@@ -50,7 +50,8 @@ Modes
 
 You can open semidbm in these modes:
 
-* ``r`` - Open dbm for reading only (default)
+* ``r`` - Open dbm for reading only (default).
+* ``w`` - Open dbm for read/write (db file must exist).
 * ``c`` - Open dbm for read/write, creating it if it doesn't exist.
 
 

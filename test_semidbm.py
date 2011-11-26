@@ -240,5 +240,25 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertEqual(db.calls, [])
 
 
+class TestWriteMode(SemiDBMTest):
+    def test_when_index_file_does_not_exist(self):
+        path = os.path.join(self.tempdir, 'foo.db')
+        self.assertRaises(semidbm.DBMError, semidbm.open, path, 'w')
+
+    def test_when_data_file_does_not_exist(self):
+        path = os.path.join(self.tempdir, 'foo.db')
+        open(path + '.idx', 'w')
+        self.assertRaises(semidbm.DBMError, semidbm.open, path, 'w')
+
+    def test_when_files_exist(self):
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+
+        db_write_mode = semidbm.open(
+            os.path.join(self.tempdir, 'myfile.db'), 'w')
+        self.assertEqual(db_write_mode['foo'], 'bar')
+
+
 if __name__ == '__main__':
     unittest.main()
