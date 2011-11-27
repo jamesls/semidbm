@@ -231,6 +231,15 @@ class _SemiDBMReadWrite(_SemiDBM):
         super(_SemiDBMReadWrite, self)._load_db(compact_index)
 
 
+class _SemiDBMNew(_SemiDBM):
+    def _load_db(self, compact_index):
+        index_file = _open(self._index_filename, 'w')
+        data_file = _open(self._data_filename, 'w')
+        index_file.close()
+        data_file.close()
+        super(_SemiDBMNew, self)._load_db(compact_index)
+
+
 def open(filename, flag='r', mode=0666):
     if flag == 'r':
         return _SemiDBMReadOnly(filename)
@@ -238,3 +247,5 @@ def open(filename, flag='r', mode=0666):
         return _SemiDBM(filename)
     elif flag == 'w':
         return _SemiDBMReadWrite(filename)
+    elif flag == 'n':
+        return _SemiDBMNew(filename)

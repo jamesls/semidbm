@@ -260,5 +260,18 @@ class TestWriteMode(SemiDBMTest):
         self.assertEqual(db_write_mode['foo'], 'bar')
 
 
+class TestNewMode(SemiDBMTest):
+    def test_when_file_does_not_exist(self):
+        path = os.path.join(self.tempdir, 'foo.db')
+        db = semidbm.open(path, 'n')
+        db['foo'] = 'bar'
+        db.close()
+
+        # Opening the file again should basically blank out
+        # any existing database.
+        db = semidbm.open(path, 'n')
+        self.assertEqual(db.keys(), [])
+
+
 if __name__ == '__main__':
     unittest.main()
