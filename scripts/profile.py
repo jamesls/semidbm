@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 """Very simple script for profiling various dbms.
 
+The point of this script is to give a rough
+estimate for how semidbm does compared to other
+dbms.  You can run this script with no args or
+specify the dbms you want to benchmark using
+the --dbm arg.
+
 """
 import os
 import optparse
@@ -147,9 +153,12 @@ def main():
     basic_test(num_keys=401, value_size=512)
     basic_test(num_keys=512, value_size=401)
 
-    # Large (~10MB db size).
+    # Medium (~10MB db size).
     basic_test(num_keys=10000, value_size=1024)
     basic_test(num_keys=10000, value_size=495)
+
+    # Large
+    basic_test(num_keys=100000, value_size=128)
 
 
 if __name__ == '__main__':
