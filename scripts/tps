@@ -27,7 +27,7 @@ def main():
     try:
         dbm_module = __import__(opts.dbm)
     except ImportError:
-        sys.stderr.write("Can't import dbm: %s\n" % args.dbm)
+        sys.stderr.write("Can't import dbm: %s\n" % opts.dbm)
         sys.exit(1)
     db = dbm_module.open(f.name, 'c')
 
