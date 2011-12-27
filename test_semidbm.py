@@ -239,6 +239,38 @@ class TestReadOnlyMode(SemiDBMTest):
 
         self.assertEqual(db.calls, [])
 
+    def test_can_read_items(self):
+        db = semidbm.open(os.path.join(self.tempdir,
+                                       'myfile.db'), 'c')
+        db['foo'] = 'bar'
+        db['bar'] = 'baz'
+        db['baz'] = 'foo'
+        db.close()
+
+        read_only = self.open_db_file()
+        self.assertEqual(read_only['foo'], 'bar')
+        self.assertEqual(read_only['bar'], 'baz')
+        self.assertEqual(read_only['baz'], 'foo')
+
+    def test_key_does_not_exist(self):
+        db = semidbm.open(os.path.join(self.tempdir,
+                                       'myfile.db'), 'c')
+        db['foo'] = 'bar'
+        db.close()
+
+        read_only = self.open_db_file()
+        self.assertRaises(KeyError, read_only.__getitem__, 'bar')
+
+
+class TestReadOnlyModeNonMMapped(TestReadOnlyMode):
+    def open_db_file(self):
+        # This is the slow, non mmapped version, which is useful if the file is
+        # too big to be mmapped.  If the mmap version can account for this (say
+        # by mapping a fixed size at time) then _SemiDBMReadOnly can be
+        # removed.
+        return semidbm._SemiDBMReadOnly(
+            os.path.join(self.tempdir, 'myfile.db'))
+
 
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):

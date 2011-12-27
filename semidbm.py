@@ -7,6 +7,7 @@ dumbdbm currently has.
 
 """
 import os
+import mmap
 import __builtin__
 
 _open = __builtin__.open
@@ -221,6 +222,31 @@ class _SemiDBMReadOnly(_SemiDBM):
         self._data_file.close()
 
 
+class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
+    def _load_db(self, compact_index):
+        self._index = self._load_index(self._index_filename, compact_index)
+        # buffering=0 makes the file objects unbuffered.
+        self._index_file = _open(self._index_filename, 'ab', buffering=0)
+        self._data_file = _open(self._data_filename, 'ab+', buffering=0)
+        self._data_map = None
+        if os.path.getsize(self._data_filename) > 0:
+            self._data_map = self._mmap_datafile(self._data_file)
+
+    def _mmap_datafile(self, data_file):
+        mapped = mmap.mmap(data_file.fileno(), 0, mmap.MAP_SHARED,
+                           mmap.PROT_READ)
+        return mapped
+
+    def __getitem__(self, key):
+        offset, size = self._index[key]
+        return self._data_map[offset:offset+size]
+
+    def close(self, compact=False):
+        super(_SemiDBMReadOnlyMMap, self).close()
+        if self._data_map is not None:
+            self._data_map.close()
+
+
 class _SemiDBMReadWrite(_SemiDBM):
     def _load_db(self, compact_index):
         if not os.path.isfile(self._index_filename):
@@ -242,7 +268,7 @@ class _SemiDBMNew(_SemiDBM):
 
 def open(filename, flag='r', mode=0666):
     if flag == 'r':
-        return _SemiDBMReadOnly(filename)
+        return _SemiDBMReadOnlyMMap(filename)
     elif flag == 'c':
         return _SemiDBM(filename)
     elif flag == 'w':
