@@ -9,6 +9,9 @@ the --dbm arg.
 
 """
 import os
+import sys
+import stat
+import shutil
 import optparse
 import time
 import tempfile
@@ -18,147 +21,220 @@ random.seed(100)
 
 
 _potential_dbms = ['dbhash', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
-DBMS = []
-TEMPDIR = tempfile.mkdtemp(prefix='dbmprofile')
 
 
 def set_dbms(dbms):
-    DBMS[:] = []
+    dbms_found = []
     for potential in dbms:
         try:
             d = __import__(potential)
-            DBMS.append(d)
+            dbms_found.append(d)
         except ImportError:
             continue
+    return dbms_found
 
 
-def print_time(f):
-    def _time_function(*args, **kwargs):
-        start = time.time()
-        f(*args, **kwargs)
-        end = time.time()
-        print "%.6f" % (end - start),
-    return _time_function
+class Options(object):
+    num_keys = 1000000
+    key_size_bytes = 16
+    value_size_bytes = 100
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def print_options(self):
+        stats = ("    num_keys  : %(num_keys)s\n"
+                 "    key_size  : %(key_size_bytes)s\n"
+                 "    value_size: %(value_size_bytes)s" % self.__dict__)
+        return stats
+
+    @property
+    def key_format(self):
+        return '%0' + str(self.key_size_bytes) + 'd'
 
 
-def basic_test(num_keys, value_size):
-    title = "\n\nbasic keys=%s value_size=%s" % (num_keys, value_size)
-    print title
-    print '=' * len(title)
-    print
-    for dbm in DBMS:
-        _clean_out_dir(TEMPDIR)
-        fresh_populate(dbm, num_keys, value_size)
-        sequential_reads(dbm, num_keys)
-        keys = range(num_keys)
-        random.shuffle(keys)
-        random_reads(dbm, keys)
-        fixed_reads(dbm, keys[:100])
-        new_keys = [str(k) + "_new" for k in keys[:100]]
-        fixed_writes(dbm, new_keys, value_size)
-        if dbm.__name__ == 'dumbdbm' and num_keys * value_size > 500000:
-            # dumbdbm writes out the entire index on
-            # a delete, so these were taking on the
-            # order of minutes for the 10MB tests.
-            print "delall: TOOOSLOW",
-        else:
-            delete_all(dbm, num_keys)
-        load_twice(dbm)
-        print
-    _clean_out_dir(TEMPDIR)
+class StatsReporter(object):
+    def __init__(self, name, times, total_bytes, total_ops):
+        self._name = name
+        self._times = times
+        self._total_bytes = total_bytes
+        self._total_ops = total_ops
+
+    def total_time(self):
+        return self._times[-1] - self._times[0]
+
+    def micros_per_op(self):
+        # Leveldb uses this, so it's useful to compare.
+        total_micros = self.total_time() * 1e6
+        return total_micros / self._total_ops
+
+    def ops_per_second(self):
+        return self._total_ops / float(self.total_time())
+
+    def megabytes_per_second(self):
+        return self._total_bytes / (1024.0 * 1024) / self.total_time()
+
+    def print_report(self):
+        print "%-20s:" % self._name,
+        print ("time: %9.3f,   micros/ops: %9.3f,   ops/s: %10.3f,  "
+               "MB/s: %10.3f" % (self.total_time(), self.micros_per_op(),
+                                self.ops_per_second(),
+                                self.megabytes_per_second()))
 
 
-def _clean_out_dir(dirname):
-    for path in os.listdir(dirname):
-        os.remove(os.path.join(dirname, path))
+class Benchmarks(object):
+    def __init__(self, options, tmpdir):
+        self.options = options
+        self.tmpdir = tmpdir
+        self.random_values = self._generate_random_string(1024 * 1024)
 
+    def _generate_random_string(self, string_size):
+        print "Generating random data."
+        c = chr
+        rand = random.randint
+        return ''.join(c(rand(0, 255)) for i in xrange(string_size))
 
-@print_time
-def fresh_populate(dbm, num_keys, value_size):
-    print "%-8s %-7s %-6s" % (dbm.__name__, num_keys,
-                              value_size),
-    print "load:",
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'c')
-    for i in xrange(num_keys):
-        db[str(i)] = os.urandom(value_size)
-    db.close()
+    def run(self, dbm):
+        print "Benchmarking:", dbm
+        print self.options.print_options()
+        report = self.fill_sequential(dbm)
+        report.print_report()
 
+        report = self.read_hot(dbm)
+        report.print_report()
 
-@print_time
-def sequential_reads(dbm, num_keys):
-    print "seq_read:",
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'r')
-    for i in xrange(num_keys):
-        db[str(i)]
-    db.close()
+        report = self.read_sequential(dbm)
+        report.print_report()
 
+        report = self.read_random(dbm)
+        report.print_report()
 
-@print_time
-def random_reads(dbm, key_order):
-    print "random:",
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'r')
-    for key in key_order:
-        db[str(key)]
-    db.close()
+    def fill_sequential(self, dbm):
+        db = self._load_dbm(dbm)
+        key_format = self.options.key_format
+        random_values = self.random_values
+        maxlen = len(random_values)
+        position = 0
+        value_size = self.options.value_size_bytes
+        num_keys = self.options.num_keys
 
+        t = time.time
+        times = [t()]
+        times_append = times.append
+        out = sys.stdout.write
+        flush = sys.stdout.flush
+        for i in xrange(num_keys):
+            db[key_format % i] = random_values[position:position+value_size]
+            times_append(t())
+            position += value_size
+            if position + value_size > maxlen:
+                position = 0
+                out("(%s/%s)\r" % (i, num_keys))
+                flush()
+        db.close()
+        return StatsReporter(
+            'fill_sequential', times,
+            (value_size * num_keys) + (self.options.key_size_bytes * num_keys),
+            num_keys)
 
-@print_time
-def fixed_reads(dbm, key_order):
-    # This is to test how long it takes to read a fixed amount of keys.
-    print "read%s:" % len(key_order),
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'r')
-    for key in key_order:
-        db[str(key)]
-    db.close()
+    def read_sequential(self, dbm):
+        # Assumes fill_sequential has been called.
+        db = self._load_dbm(dbm, 'r')
+        key_format = self.options.key_format
+        num_keys = self.options.num_keys
 
+        indices = [key_format % i for i in xrange(num_keys)]
+        t = time.time
+        times = [t()]
+        times_append = times.append
+        for i in xrange(num_keys):
+            db[indices[i]]
+            times_append(t())
+        db.close()
+        total_bytes = (self.options.key_size_bytes * num_keys +
+                       self.options.value_size_bytes * num_keys)
+        return StatsReporter('read_sequential', times, total_bytes, num_keys)
 
-@print_time
-def fixed_writes(dbm, key_order, value_size):
-    print "write%s:" % len(key_order),
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'c')
-    for key in key_order:
-        db[key] = os.urandom(value_size)
-    db.close()
+    def read_hot(self, dbm):
+        # Assumes fill_sequential has been called.
+        # Read from 1% of the database self.options.num_keys times.
+        # This should test the effectiveness of any caching being used.
+        num_keys = self.options.num_keys
+        unique_keys = int(num_keys * 0.01)
+        indices = [self.options.key_format % i for i in random.sample(
+            xrange(num_keys), unique_keys)]
+        db = self._load_dbm(dbm, 'r')
+        t = time.time
+        times = [t()]
+        times_append = times.append
+        for i in xrange(num_keys):
+            db[indices[i % unique_keys]]
+            times_append(t())
+        db.close()
+        total_bytes = (self.options.key_size_bytes * num_keys +
+                       self.options.value_size_bytes * num_keys)
+        return StatsReporter('read_hot', times, total_bytes,
+                             num_keys)
 
+    def read_random(self, dbm):
+        # This doesn't matter to semidbm because the keys
+        # aren't ordered, but other dbms might be impacted.
+        num_keys = self.options.num_keys
+        key_format = self.options.key_format
+        indices = [key_format % i for i in range(num_keys)]
+        random.shuffle(indices)
+        db = self._load_dbm(dbm, 'r')
+        t = time.time
+        times = [t()]
+        times_append = times.append
+        for i in xrange(num_keys):
+            db[indices[i]]
+            times_append(t())
+        db.close()
+        total_bytes = (self.options.key_size_bytes * num_keys +
+                       self.options.value_size_bytes * num_keys)
+        return StatsReporter('read_random', times, total_bytes,
+                             num_keys)
 
-@print_time
-def delete_all(dbm, num_keys):
-    print "delall:",
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'c')
-    for i in xrange(num_keys):
-        del db[str(i)]
-    db.close()
+    def delete_dbm(self):
+        # Just wipe out everything under tmpdir.
+        self._rmtree(self.tmpdir)
 
+    def _rmtree(self, tmpdir):
+        # Delete everything under tmpdir but don't actually
+        # delete tmpdir itself.
+        for path in os.listdir(tmpdir):
+            full_path = os.path.join(tmpdir, path)
+            mode = os.lstat(full_path).st_mode
+            if stat.S_ISDIR(mode):
+                self._rmtree(full_path)
+            else:
+                os.remove(full_path)
 
-@print_time
-def load_twice(dbm):
-    print "load2",
-    db = dbm.open(os.path.join(TEMPDIR, 'db'), 'c')
-    db.close()
-    db2 = dbm.open(os.path.join(TEMPDIR, 'db'), 'c')
-    db2.close()
+    def _load_dbm(self, dbm, flags='c'):
+        db = dbm.open(os.path.join(self.tmpdir, 'db'), flags)
+        return db
 
 
 def main():
     parser = optparse.OptionParser()
     parser.add_option('--dbm', dest='dbms', action='append')
+    # These are the same defaults as the leveldb benchmark,
+    # which this scripts is based off of.
+    parser.add_option('-n', '--num-keys', default=1000000, type=int)
+    parser.add_option('-k', '--key-size-bytes', default=16, type=int)
+    parser.add_option('-s', '--value-size-bytes', default=100, type=int)
     opts, args = parser.parse_args()
-    if opts.dbms:
-        set_dbms(opts.dbms)
-    else:
-        set_dbms(_potential_dbms)
-    # These generate the same amount of value data,
-    # but one is 401 keys with 512 byte sizes and the
-    # other is 512 keys with 401 byte sizes.
-    basic_test(num_keys=401, value_size=512)
-    basic_test(num_keys=512, value_size=401)
 
-    # Medium (~10MB db size).
-    basic_test(num_keys=10000, value_size=1024)
-    basic_test(num_keys=10000, value_size=495)
 
-    # Large
-    basic_test(num_keys=100000, value_size=128)
+    dbm_names = opts.__dict__.pop('dbms') or _potential_dbms
+    dbms = set_dbms(dbm_names)
+    options = Options(**opts.__dict__)
+    tmpdir = tempfile.mkdtemp(prefix='dbmprofile')
+    benchmarks = Benchmarks(options, tmpdir)
+    for dbm in dbms:
+        benchmarks.run(dbm)
+    shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
