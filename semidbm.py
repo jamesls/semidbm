@@ -268,7 +268,7 @@ class _SemiDBMNew(_SemiDBM):
 
 def open(filename, flag='r', mode=0666):
     if flag == 'r':
-        return _SemiDBMReadOnlyMMap(filename)
+        return _SemiDBMReadOnly(filename)
     elif flag == 'c':
         return _SemiDBM(filename)
     elif flag == 'w':
