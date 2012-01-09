@@ -119,7 +119,6 @@ class _SemiDBM(object):
         offset, size = self._index[key]
         self._data_file.seek(offset)
         data = self._data_file.read(size)
-        self._data_file.seek(0, 2)
         return data
 
     def __setitem__(self, key, value):
@@ -136,8 +135,8 @@ class _SemiDBM(object):
         # Write the new data out at the end of the file.
         # Returns the offset of where this data is located
         # in the file.
-        offset = data_file.tell()
         data_file.write(value)
+        offset = data_file.tell() - len(value)
         return offset
 
     def __contains__(self, key):
