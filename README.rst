@@ -68,6 +68,10 @@ Limitations
 * The entire index must fit in memory.
 
 
+Post feedback and issues on `github issues`_, or check out the
+latest changes at the github `repo`_.
+
+
 Changelog
 ---------
 
@@ -89,3 +93,7 @@ Changelog
   * ``sync()`` is called during compaction and on ``close()``.
 
 * Add a ``DBMLoadError`` exception for catching semidbm loading errors.
+
+
+.. _github issues: https://github.com/jamesls/semidbm/issues
+.. _repo: https://github.com/jamesls/semidbm
