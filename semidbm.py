@@ -12,6 +12,7 @@ import __builtin__
 
 _open = __builtin__.open
 _DELETED = -1
+__version__ = '0.2.1'
 
 
 class DBMError(Exception):

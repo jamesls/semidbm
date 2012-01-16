@@ -9,6 +9,11 @@ have no other options available.  It uses a similar design to dumbdbm which
 means that it does inherit some of the same problems as dumbdbm, but it also
 attempts to fix problems in dumbdbm, which makes it only a semi-dumb dbm :)
 
+A design goal of semidbm is to remain a pure python dbm.  This makes
+installation easy and allows semidbm to be used on any platform that
+supports python.
+
+
 ============
 Improvements
 ============
@@ -53,6 +58,7 @@ You can open semidbm in these modes:
 * ``r`` - Open dbm for reading only (default).
 * ``w`` - Open dbm for read/write (db file must exist).
 * ``c`` - Open dbm for read/write, creating it if it doesn't exist.
+* ``n`` - Open dbm for read/write, erasing exisiting dbm if it exists.
 
 
 Limitations
@@ -65,6 +71,16 @@ Limitations
 Changelog
 ---------
 
+0.2.1
+
+* DB can be opened with ``r``, ``c``, ``w``, and ``n``.
+* Add a memory mapped read only implementation for reading
+  from the DB (if your entire data file can be mmapped this
+  provides a huge performance boost for reads).
+* Benchmark scripts rewritten to provide more useful information.
+
+
+~~~~~
 0.2.0
 ~~~~~
 
