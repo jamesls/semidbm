@@ -75,7 +75,15 @@ latest changes at the github `repo`_.
 Changelog
 ---------
 
+0.3.0
+
+* The data file and the index file are kept in directory.  To load
+  the the db you specify the directory name instead of the data filename.
+
+
+~~~~~
 0.2.1
+~~~~~
 
 * DB can be opened with ``r``, ``c``, ``w``, and ``n``.
 * Add a memory mapped read only implementation for reading

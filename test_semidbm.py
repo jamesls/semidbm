@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import shutil
 import unittest
 import tempfile
 import StringIO
@@ -13,13 +14,22 @@ class SemiDBMTest(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp(prefix='semidbm_ut')
 
     def tearDown(self):
-        for f in os.listdir(self.tempdir):
-            os.remove(os.path.join(self.tempdir, f))
-        os.rmdir(self.tempdir)
+        shutil.rmtree(self.tempdir)
 
     def open_db_file(self):
         return semidbm.open(os.path.join(self.tempdir,
                                          'myfile.db'), 'c')
+
+    def open_index_file(self, dbdir, mode='r'):
+        """Given a dbdir, return a fileobj of the index file.
+
+        The dbdir will be created if needed.
+        """
+        if not os.path.exists(dbdir):
+            os.makedirs(dbdir)
+        index_filename = os.path.join(dbdir, 'data.idx')
+        return open(index_filename, mode=mode)
+
 
 class TestSemiDBM(SemiDBMTest):
     def test_insert_then_retrieve(self):
@@ -178,25 +188,25 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db2['after'], 'after')
 
     def test_loading_error_bad_format(self):
-        filename = os.path.join(self.tempdir, 'bad.db')
-        with open(filename + '.idx', 'w') as f:
+        dbdir = os.path.join(self.tempdir, 'bad.db')
+        with self.open_index_file(dbdir=dbdir, mode='w') as f:
             f.write("bad index file")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
 
     def test_loading_error_bad_line(self):
-        filename = os.path.join(self.tempdir, 'bad.db')
-        with open(filename + '.idx', 'w') as f:
+        dbdir = os.path.join(self.tempdir, 'bad.db')
+        with self.open_index_file(dbdir=dbdir, mode='w') as f:
             # The first number should be 3 not 4, so
             # a DBMLoadError is expected.
             f.write("4:foo3:1242:12\n")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
 
     def test_loading_error_missing_fields(self):
-        filename = os.path.join(self.tempdir, 'bad.db')
-        with open(filename + '.idx', 'w') as f:
+        dbdir = os.path.join(self.tempdir, 'bad.db')
+        with self.open_index_file(dbdir=dbdir, mode='w') as f:
             # Missing the size attribute (the third value of the line).
             f.write("4:foo3:124\n4:bar3:189\n")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, filename, 'c')
+        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
 
     def test_sync_contents(self):
         # So there's not really a good way to test this, so

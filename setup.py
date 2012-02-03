@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='semidbm',
-    version='0.2.1',
+    version='0.3.0',
     description="An alternative to python's dumbdbm",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.rst')).read(),

@@ -12,7 +12,7 @@ import __builtin__
 
 _open = __builtin__.open
 _DELETED = -1
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 
 
 class DBMError(Exception):
@@ -40,15 +40,21 @@ class DBMLoadError(DBMError):
 # 12 bytes long.
 
 class _SemiDBM(object):
-    def __init__(self, filename, compact_on_open=True):
-        self._data_filename = filename
-        self._index_filename = filename + os.extsep + 'idx'
+    def __init__(self, dbdir, compact_on_open=True):
+        self._dbdir = dbdir
+        self._data_filename = os.path.join(dbdir, 'data')
+        self._index_filename = os.path.join(dbdir, 'data' + os.extsep + 'idx')
         self._index = None
         self._index_file = None
         self._data_file = None
         self._load_db(compact_on_open)
 
+    def _create_db_dir(self):
+        if not os.path.exists(self._dbdir):
+            os.makedirs(self._dbdir)
+
     def _load_db(self, compact_index):
+        self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
         # buffering=0 makes the file objects unbuffered.
         self._index_file = _open(self._index_filename, 'ab', buffering=0)
@@ -259,11 +265,21 @@ class _SemiDBMReadWrite(_SemiDBM):
 
 class _SemiDBMNew(_SemiDBM):
     def _load_db(self, compact_index):
+        self._create_db_dir()
+        self._remove_files_in_dbdir()
         index_file = _open(self._index_filename, 'w')
         data_file = _open(self._data_filename, 'w')
         index_file.close()
         data_file.close()
         super(_SemiDBMNew, self)._load_db(compact_index)
+
+    def _remove_files_in_dbdir(self):
+        # We want to create a new DB so we need to remove
+        # all of the existing files in the dbdir.
+        if os.path.exists(self._data_filename):
+            os.remove(self._data_filename)
+        if os.path.exists(self._index_filename):
+            os.remove(self._index_filename)
 
 
 def open(filename, flag='r', mode=0666):
