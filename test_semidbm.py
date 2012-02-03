@@ -249,6 +249,16 @@ class TestReadOnlyMode(SemiDBMTest):
 
         self.assertEqual(db.calls, [])
 
+    def test_open_read_multiple_times(self):
+        db = semidbm.open(os.path.join(self.tempdir,
+                                       'myfile.db'), 'c')
+        db['foo'] = 'bar'
+        db.close()
+        # Open then close db immediately.
+        self.open_db_file().close()
+        read_only = self.open_db_file()
+        self.assertEqual(read_only['foo'], 'bar')
+
     def test_can_read_items(self):
         db = semidbm.open(os.path.join(self.tempdir,
                                        'myfile.db'), 'c')
@@ -272,14 +282,19 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertRaises(KeyError, read_only.__getitem__, 'bar')
 
 
-class TestReadOnlyModeNonMMapped(TestReadOnlyMode):
+class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self):
-        # This is the slow, non mmapped version, which is useful if the file is
-        # too big to be mmapped.  If the mmap version can account for this (say
-        # by mapping a fixed size at time) then _SemiDBMReadOnly can be
-        # removed.
-        return semidbm._SemiDBMReadOnly(
+        return semidbm._SemiDBMReadOnlyMMap(
             os.path.join(self.tempdir, 'myfile.db'))
+
+    def test_load_empty_db(self):
+        db = semidbm.open(os.path.join(self.tempdir,
+                                       'myfile.db'), 'c')
+        db.close()
+        empty_db = self.open_db_file()
+        keys = empty_db.keys()
+        empty_db.close()
+        self.assertEqual(keys, [])
 
 
 class TestWriteMode(SemiDBMTest):

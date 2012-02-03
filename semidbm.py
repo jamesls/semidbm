@@ -230,6 +230,7 @@ class _SemiDBMReadOnly(_SemiDBM):
 
 class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
     def _load_db(self, compact_index):
+        self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
         # buffering=0 makes the file objects unbuffered.
         self._index_file = _open(self._index_filename, 'ab', buffering=0)
