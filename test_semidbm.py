@@ -12,6 +12,7 @@ import semidbm
 class SemiDBMTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp(prefix='semidbm_ut')
+        self.dbdir = os.path.join(self.tempdir, 'myfile.db')
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
@@ -20,11 +21,21 @@ class SemiDBMTest(unittest.TestCase):
         return semidbm.open(os.path.join(self.tempdir,
                                          'myfile.db'), 'c')
 
-    def open_index_file(self, dbdir, mode='r'):
+    def open_data_file(self, dbdir=None, mode='r'):
+        if dbdir is None:
+            dbdir = self.dbdir
+        if not os.path.exists(dbdir):
+            os.makedirs(dbdir)
+        data_filename = os.path.join(dbdir, 'data')
+        return open(data_filename, mode=mode)
+
+    def open_index_file(self, dbdir=None, mode='r'):
         """Given a dbdir, return a fileobj of the index file.
 
         The dbdir will be created if needed.
         """
+        if dbdir is None:
+            dbdir = self.dbdir
         if not os.path.exists(dbdir):
             os.makedirs(dbdir)
         index_filename = os.path.join(dbdir, 'data.idx')
@@ -299,13 +310,11 @@ class TestReadOnlyModeMMapped(TestReadOnlyMode):
 
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):
-        path = os.path.join(self.tempdir, 'foo.db')
-        self.assertRaises(semidbm.DBMError, semidbm.open, path, 'w')
+        self.open_index_file(mode='w')
+        self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
 
     def test_when_data_file_does_not_exist(self):
-        path = os.path.join(self.tempdir, 'foo.db')
-        open(path + '.idx', 'w')
-        self.assertRaises(semidbm.DBMError, semidbm.open, path, 'w')
+        self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
 
     def test_when_files_exist(self):
         db = self.open_db_file()
