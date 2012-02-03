@@ -18,8 +18,7 @@ class SemiDBMTest(unittest.TestCase):
         shutil.rmtree(self.tempdir)
 
     def open_db_file(self):
-        return semidbm.open(os.path.join(self.tempdir,
-                                         'myfile.db'), 'c')
+        return semidbm.open(self.dbdir, 'c')
 
     def open_data_file(self, dbdir=None, mode='r'):
         if dbdir is None:
@@ -231,8 +230,7 @@ class TestSemiDBM(SemiDBMTest):
 
 class TestReadOnlyMode(SemiDBMTest):
     def open_db_file(self):
-        return semidbm.open(os.path.join(self.tempdir,
-                                         'myfile.db'), 'r')
+        return semidbm.open(self.dbdir, 'r')
 
     def test_cant_setitem(self):
         db = self.open_db_file()
@@ -261,8 +259,7 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertEqual(db.calls, [])
 
     def test_open_read_multiple_times(self):
-        db = semidbm.open(os.path.join(self.tempdir,
-                                       'myfile.db'), 'c')
+        db = semidbm.open(self.dbdir, 'c')
         db['foo'] = 'bar'
         db.close()
         # Open then close db immediately.
@@ -271,8 +268,7 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertEqual(read_only['foo'], 'bar')
 
     def test_can_read_items(self):
-        db = semidbm.open(os.path.join(self.tempdir,
-                                       'myfile.db'), 'c')
+        db = semidbm.open(self.dbdir, 'c')
         db['foo'] = 'bar'
         db['bar'] = 'baz'
         db['baz'] = 'foo'
@@ -284,8 +280,7 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertEqual(read_only['baz'], 'foo')
 
     def test_key_does_not_exist(self):
-        db = semidbm.open(os.path.join(self.tempdir,
-                                       'myfile.db'), 'c')
+        db = semidbm.open(self.dbdir, 'c')
         db['foo'] = 'bar'
         db.close()
 
@@ -295,12 +290,10 @@ class TestReadOnlyMode(SemiDBMTest):
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self):
-        return semidbm._SemiDBMReadOnlyMMap(
-            os.path.join(self.tempdir, 'myfile.db'))
+        return semidbm._SemiDBMReadOnlyMMap(self.dbdir)
 
     def test_load_empty_db(self):
-        db = semidbm.open(os.path.join(self.tempdir,
-                                       'myfile.db'), 'c')
+        db = semidbm.open(self.dbdir, 'c')
         db.close()
         empty_db = self.open_db_file()
         keys = empty_db.keys()
@@ -321,8 +314,7 @@ class TestWriteMode(SemiDBMTest):
         db['foo'] = 'bar'
         db.close()
 
-        db_write_mode = semidbm.open(
-            os.path.join(self.tempdir, 'myfile.db'), 'w')
+        db_write_mode = semidbm.open(self.dbdir, 'w')
         self.assertEqual(db_write_mode['foo'], 'bar')
 
 
