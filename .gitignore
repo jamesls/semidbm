@@ -1,3 +1,4 @@
 build/*
 dist/*
 semidbm.egg-info/*
+.coverage
