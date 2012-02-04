@@ -28,7 +28,7 @@ def main():
     tempdir = tempfile.mkdtemp(prefix='tps')
     dbname = os.path.join(tempdir, 'tps.db')
     try:
-        dbm_module = __import__(opts.dbm)
+        dbm_module = __import__(opts.dbm, fromlist=[opts.dbm])
     except ImportError:
         sys.stderr.write("Can't import dbm: %s\n" % opts.dbm)
         sys.exit(1)

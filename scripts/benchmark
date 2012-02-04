@@ -22,12 +22,15 @@ random.seed(100)
 
 _potential_dbms = ['dbhash', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
 
+ADAPTER_DIR = os.path.join(os.path.dirname(__file__), 'adapters')
+sys.path.append(ADAPTER_DIR)
+
 
 def set_dbms(dbms):
     dbms_found = []
     for potential in dbms:
         try:
-            d = __import__(potential)
+            d = __import__(potential, fromlist=[potential])
             dbms_found.append(d)
         except ImportError:
             continue
