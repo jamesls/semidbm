@@ -77,7 +77,7 @@ Changelog
 
 0.3.0
 
-* The data file and the index file are kept in directory.  To load
+* The data file and the index file are kept in a separate directory.  To load
   the the db you specify the directory name instead of the data filename.
 
 
