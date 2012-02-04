@@ -97,17 +97,20 @@ class Benchmarks(object):
     def run(self, dbm):
         print "Benchmarking:", dbm
         print self.options.print_options()
-        report = self.fill_sequential(dbm)
-        report.print_report()
+        try:
+            report = self.fill_sequential(dbm)
+            report.print_report()
 
-        report = self.read_hot(dbm)
-        report.print_report()
+            report = self.read_hot(dbm)
+            report.print_report()
 
-        report = self.read_sequential(dbm)
-        report.print_report()
+            report = self.read_sequential(dbm)
+            report.print_report()
 
-        report = self.read_random(dbm)
-        report.print_report()
+            report = self.read_random(dbm)
+            report.print_report()
+        finally:
+            self.delete_dbm()
 
     def fill_sequential(self, dbm):
         db = self._load_dbm(dbm)
