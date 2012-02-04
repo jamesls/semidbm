@@ -2,8 +2,10 @@
 # Ok so I know this is basically a bs metric, but it's still fun to see what the numbers
 # are.  But be warned, don't take these numbers too seriously.
 import sys
-import tempfile
+import shutil
 import time
+import os
+import tempfile
 import optparse
 
 
@@ -23,13 +25,14 @@ def main():
     parser.add_option('-d', '--dbm', default='semidbm')
     opts, args = parser.parse_args()
 
-    f = tempfile.NamedTemporaryFile()
+    tempdir = tempfile.mkdtemp(prefix='tps')
+    dbname = os.path.join(tempdir, 'tps.db')
     try:
         dbm_module = __import__(opts.dbm)
     except ImportError:
         sys.stderr.write("Can't import dbm: %s\n" % opts.dbm)
         sys.exit(1)
-    db = dbm_module.open(f.name, 'c')
+    db = dbm_module.open(dbname, 'c')
 
     num_transactions = opts.num_transactions
     groups_of = opts.chunk_size
@@ -43,7 +46,7 @@ def main():
     print "Total: %.5f, tps: %.2f" % (end - start,
                                       float(num_transactions) / (end - start))
     db.close()
-    db = dbm_module.open(f.name, 'r')
+    db = dbm_module.open(dbname, 'r')
     start = time.time()
     for i in xrange(num_transactions):
         db[str(i)]
@@ -68,6 +71,7 @@ def main():
         print "Total: %.5f, tps: %.2f" % (end - start,
                                           float(count) / (end - start))
     db.close()
+    shutil.rmtree(tempdir)
 
 
 if __name__ == '__main__':
