@@ -238,9 +238,16 @@ def main():
     options = Options(**opts.__dict__)
     tmpdir = tempfile.mkdtemp(prefix='dbmprofile')
     benchmarks = Benchmarks(options, tmpdir)
-    for dbm in dbms:
-        benchmarks.run(dbm)
-    shutil.rmtree(tmpdir)
+    try:
+        for dbm in dbms:
+            try:
+                benchmarks.run(dbm)
+            except Exception, e:
+                sys.stderr.write(
+                    "ERROR: exception caught when benchmarking %s: %s\n" %
+                    (dbm, e))
+    finally:
+        shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
