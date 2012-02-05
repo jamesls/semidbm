@@ -224,7 +224,7 @@ class Benchmarks(object):
 
 def main():
     parser = optparse.OptionParser()
-    parser.add_option('--dbm', dest='dbms', action='append')
+    parser.add_option('-d', '--dbm', dest='dbms', action='append')
     # These are the same defaults as the leveldb benchmark,
     # which this scripts is based off of.
     parser.add_option('-n', '--num-keys', default=1000000, type=int)
