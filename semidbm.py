@@ -203,6 +203,7 @@ class _SemiDBM(object):
         new_db.close()
         os.rename(new_db._index_filename, self._index_filename)
         os.rename(new_db._data_filename, self._data_filename)
+        os.rmdir(new_db._dbdir)
         # The index is already compacted so we don't need to compact it.
         self._load_db(compact_index=False)
 

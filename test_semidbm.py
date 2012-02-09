@@ -128,6 +128,20 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertEqual(os.stat(db2._index_filename).st_size, 0)
 
+    def test_compaction_does_not_leave_behind_files(self):
+        db = self.open_db_file()
+        before = len(os.listdir(self.dbdir))
+        for i in xrange(10):
+            db[str(i)] = str(i)
+        for i in xrange(10):
+            del db[str(i)]
+        db.close()
+        db2 = self.open_db_file()
+        db2.compact()
+        db2.close()
+        after = len(os.listdir(self.dbdir))
+        self.assertEqual(before, after, os.listdir(self.dbdir))
+
     def test_compaction_of_index_file_on_open_updates(self):
         # This is definitely implementation specific, but
         # I can't think of a better way to validate
