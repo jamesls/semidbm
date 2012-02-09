@@ -115,7 +115,7 @@ class _SemiDBM(object):
         for line in contents:
             start = 0
             items = []
-            for i in xrange(3):
+            for _ in xrange(3):
                 end = line.find(':', start)
                 item_length = int(line[start:end])
                 items.append(line[end + 1:end + item_length + 1])
@@ -229,13 +229,16 @@ class _SemiDBMReadOnly(_SemiDBM):
 
 
 class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
+    def __init__(self, dbdir, compact_on_open=True):
+        self._data_map = None
+        super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, compact_on_open)
+
     def _load_db(self, compact_index):
         self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
         # buffering=0 makes the file objects unbuffered.
         self._index_file = _open(self._index_filename, 'ab', buffering=0)
         self._data_file = _open(self._data_filename, 'ab+', buffering=0)
-        self._data_map = None
         if os.path.getsize(self._data_filename) > 0:
             self._data_map = self._mmap_datafile(self._data_file)
 
