@@ -100,16 +100,13 @@ class _SemiDBM(object):
         f = _open(new_index_filename, 'w')
         for key in index:
             offset, value_length = index[key]
-            self._write_index_entry(f, key, offset, value_length)
+            f.write('%s:%s%s:%s%s:%s\n' % (
+                len(str(key)), key, len(str(offset)), offset,
+                len(str(value_length)), value_length))
         f.flush()
         os.fsync(f.fileno())
         f.close()
         os.rename(new_index_filename, self._index_filename)
-
-    def _write_index_entry(self, fileobj, key, offset, value_length):
-        fileobj.write('%s:%s%s:%s%s:%s\n' % (
-            len(str(key)), key, len(str(offset)), offset,
-            len(str(value_length)), value_length))
 
     def _read_index(self, contents):
         for line in contents:
@@ -123,35 +120,38 @@ class _SemiDBM(object):
             yield items
 
     def __getitem__(self, key):
+        data_file = self._data_file
         offset, size = self._index[key]
-        self._data_file.seek(offset)
-        data = self._data_file.read(size)
-        return data
+        data_file.seek(offset)
+        return data_file.read(size)
 
     def __setitem__(self, key, value):
-        offset = self._write_to_data_file(value, self._data_file)
-        value_length = len(value)
-        self._add_item_to_index(key, offset, value_length)
-
-    def _add_item_to_index(self, key, offset, value_length):
-        self._write_index_entry(self._index_file, key, offset,
-                                value_length)
-        self._index[key] = (offset, value_length)
-
-    def _write_to_data_file(self, value, data_file):
         # Write the new data out at the end of the file.
         # Returns the offset of where this data is located
         # in the file.
+        _len = len
+        _str = str
+        data_file = self._data_file
         data_file.write(value)
-        offset = data_file.tell() - len(value)
-        return offset
+        offset = data_file.tell() - _len(value)
+        value_length = _len(value)
+        # Update the index file.
+        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
+            _len(_str(key)), key, _len(_str(offset)), offset,
+            _len(_str(value_length)), value_length))
+        # Update the in memory index.
+        self._index[key] = (offset, value_length)
 
     def __contains__(self, key):
         return key in self._index
 
     def __delitem__(self, key):
         offset = self._index[key][0]
-        self._add_item_to_index(key, offset, _DELETED)
+        _len = len
+        _str = str
+        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
+            _len(_str(key)), key, _len(_str(offset)), offset,
+            _len(_str(_DELETED)), _DELETED))
         del self._index[key]
 
     def __iter__(self):
