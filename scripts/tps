@@ -19,6 +19,9 @@ def main():
                       help="For the read chunked tests, this will "
                       "specify how many times to iterate over the chunks "
                       "before moving on to the next chunk.")
+    parser.add_option('-t', '--skip-read-test', action="store_true",
+                      default=False, help="Skip the sequential read test "
+                      "(useful if you just want to benchmark writes)")
     parser.add_option('-s', '--skip-read-chunk', action="store_true",
                       default=False, help="Skip the read chunk test "
                       "(it can take a while to run).")
@@ -45,16 +48,17 @@ def main():
     print "Write ",
     print "Total: %.5f, tps: %.2f" % (end - start,
                                       float(num_transactions) / (end - start))
-    db.close()
-    db = dbm_module.open(dbname, 'r')
-    start = time.time()
-    for i in xrange(num_transactions):
-        db[str(i)]
-    end = time.time()
+    if not opts.skip_read_test:
+        db.close()
+        db = dbm_module.open(dbname, 'r')
+        start = time.time()
+        for i in xrange(num_transactions):
+            db[str(i)]
+        end = time.time()
 
-    print "Read ",
-    print "Total: %.5f, tps: %.2f" % (end - start,
-                                      float(num_transactions) / (end - start))
+        print "Read ",
+        print "Total: %.5f, tps: %.2f" % (end - start,
+                                          float(num_transactions) / (end - start))
 
 
     if not opts.skip_read_chunk:
