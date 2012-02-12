@@ -345,5 +345,10 @@ class TestNewMode(SemiDBMTest):
         self.assertEqual(db.keys(), [])
 
 
+class TestInvalidModeArgument(unittest.TestCase):
+    def test_invalid_open_arg_raises_exception(self):
+        self.assertRaises(ValueError, semidbm.open, 'foo.db', 'z')
+
+
 if __name__ == '__main__':
     unittest.main()

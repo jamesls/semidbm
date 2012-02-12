@@ -296,3 +296,5 @@ def open(filename, flag='r', mode=0666):
         return _SemiDBMReadWrite(filename)
     elif flag == 'n':
         return _SemiDBMNew(filename)
+    else:
+        raise ValueError("flag argument must be 'r', 'c', 'w', or 'n'")
