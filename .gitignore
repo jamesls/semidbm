@@ -2,3 +2,6 @@ build/*
 dist/*
 semidbm.egg-info/*
 .coverage
+_templates/
+_static/
+_build/
