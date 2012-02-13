@@ -6,11 +6,22 @@
 Welcome to semidbm's documentation!
 ===================================
 
-Contents:
+Contents
+--------
 
 .. toctree::
-   :maxdepth: 2
+    :maxdepth: 2
 
+    overview
+
+
+API Documentation
+-----------------
+
+.. toctree::
+    :maxdepth: 2
+
+    api_semidbm
 
 
 Indices and tables
