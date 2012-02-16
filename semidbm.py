@@ -1,9 +1,9 @@
 """An only semi-dumb DBM.
 
 This module is an attempt to do slightly better than the
-standard library's dumbdbm.  It's still not that great, but
-it does attempt to fix some of the problems that the existing
-dumbdbm currently has.
+standard library's dumbdbm.  It keeps a similar design
+to dumbdbm while improving and fixing some of dumbdbm's
+problems.
 
 """
 import os
@@ -40,6 +40,14 @@ class DBMLoadError(DBMError):
 # 12 bytes long.
 
 class _SemiDBM(object):
+    """
+    
+    :param dbdir: The directory containing the dbm files.  If the directory
+        does not exist it will be created.
+    :param compact_on_open: If this value is True, the index is compacted
+        (if needed) when the db is loaded.
+
+    """
     def __init__(self, dbdir, compact_on_open=True):
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
@@ -159,9 +167,24 @@ class _SemiDBM(object):
             yield key
 
     def keys(self):
+        """Return all they keys in the db.
+
+        The keys are returned in an arbitrary order.
+
+        """
         return self._index.keys()
 
     def close(self, compact=False):
+        """Close the db.
+
+        The data is synced to disk and the db is closed.
+        Once the db has been closed, no further reads or writes
+        are allowed.
+
+        :param compact: Indicate whether or not to compact the db
+            before closing the db.
+
+        """
         if compact:
             self.compact()
         self.sync()
@@ -169,6 +192,16 @@ class _SemiDBM(object):
         self._data_file.close()
 
     def sync(self):
+        """Sync the db to disk.
+
+        This will flush any of the existing buffers and
+        fsync the data to disk.
+
+        You should call this method to guarantee that the data
+        is written to disk.  This method is also called whenever
+        the dbm is `close()`'d.
+
+        """
         # The files are opened unbuffered so we don't technically
         # need to flush the file objects.
         self._data_file.flush()
@@ -288,6 +321,34 @@ class _SemiDBMNew(_SemiDBM):
 
 
 def open(filename, flag='r', mode=0666):
+    """Open a semidbm database.
+
+    :param filename: The name of the db.  Note that for semidbm,
+        this is actually a directory name.  The argument is named
+        `filename` to be compatible with the dbm interface.
+
+    :param flag: Specifies how the db should be opened.  `flag` can be any of these values
+
+        +---------+-------------------------------------------+
+        | Value   | Meaning                                   |
+        +=========+===========================================+
+        | ``'r'`` | Open existing database for reading only   |
+        |         | (default)                                 |
+        +---------+-------------------------------------------+
+        | ``'w'`` | Open existing database for reading and    |
+        |         | writing                                   |
+        +---------+-------------------------------------------+
+        | ``'c'`` | Open database for reading and writing,    |
+        |         | creating it if it doesn't exist           |
+        +---------+-------------------------------------------+
+        | ``'n'`` | Always create a new, empty database, open |
+        |         | for reading and writing                   |
+        +---------+-------------------------------------------+
+
+    :param mode: Not currently used (provided to be compatible with
+        the dbm interface).
+
+    """
     if flag == 'r':
         return _SemiDBMReadOnly(filename)
     elif flag == 'c':
