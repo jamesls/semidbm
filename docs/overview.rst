@@ -39,7 +39,7 @@ place all the files it needs to keep track of the keys and values stored in the
 db.  If the directory does not exist, it will be created.
 
 
-Once the db has been created, you can get and set values:
+Once the db has been created, you can get and set values::
 
     db['key1'] = 'value1'
     print db['key1']
