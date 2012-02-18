@@ -32,7 +32,8 @@ def set_dbms(dbms):
         try:
             d = __import__(potential, fromlist=[potential])
             dbms_found.append(d)
-        except ImportError:
+        except ImportError, e:
+            sys.stderr.write("Could not import %s: %s\n" % (potential, e))
             continue
     return dbms_found
 
