@@ -1,8 +1,3 @@
-.. semidbm documentation master file, created by
-   sphinx-quickstart on Sun Feb 12 21:08:54 2012.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Semidbm
 =======
 
@@ -35,6 +30,16 @@ It was written with these things in mind:
 * Simplicity.  The original design is based off of python's dumbdbm module
   in the standard library, and one of the goals of semidbm is to try to keep
   the design comparably simple.
+
+
+Contents
+--------
+
+.. toctree::
+    :maxdepth: 2
+
+    overview
+.. benchmarks
 
 
 API Documentation
