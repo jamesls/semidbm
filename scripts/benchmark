@@ -115,6 +115,7 @@ class Benchmarks(object):
             report.print_report()
         finally:
             self.delete_dbm()
+            print
 
     def fill_sequential(self, dbm):
         db = self._load_dbm(dbm)
