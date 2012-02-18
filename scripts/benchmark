@@ -242,6 +242,9 @@ def main():
 
     dbm_names = opts.__dict__.pop('dbms') or _potential_dbms
     dbms = set_dbms(dbm_names)
+    if not dbms:
+        sys.stderr.write("List of dbms is empty.\n")
+        sys.exit(1)
     options = Options(**opts.__dict__)
     tmpdir = tempfile.mkdtemp(prefix='dbmprofile')
     benchmarks = Benchmarks(options, tmpdir)
