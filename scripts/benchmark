@@ -137,7 +137,7 @@ class Benchmarks(object):
                 position = 0
                 out("(%s/%s)\r" % (i, num_keys))
                 flush()
-        db.close()
+        self._close_db(db)
         return StatsReporter(
             'fill_sequential', times,
             (value_size * num_keys) + (self.options.key_size_bytes * num_keys),
@@ -156,7 +156,7 @@ class Benchmarks(object):
         for i in xrange(num_keys):
             db[indices[i]]
             times_append(t())
-        db.close()
+        self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
         return StatsReporter('read_sequential', times, total_bytes, num_keys)
@@ -176,7 +176,7 @@ class Benchmarks(object):
         for i in xrange(num_keys):
             db[indices[i % unique_keys]]
             times_append(t())
-        db.close()
+        self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
         return StatsReporter('read_hot', times, total_bytes,
@@ -196,7 +196,7 @@ class Benchmarks(object):
         for i in xrange(num_keys):
             db[indices[i]]
             times_append(t())
-        db.close()
+        self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
         return StatsReporter('read_random', times, total_bytes,
@@ -220,6 +220,12 @@ class Benchmarks(object):
     def _load_dbm(self, dbm, flags='c'):
         db = dbm.open(os.path.join(self.tmpdir, 'db'), flags)
         return db
+
+    def _close_db(self, db):
+        # If the db has a close() method call it.  Basically a hack
+        # so we can benchmark a normal python dict.
+        if hasattr(db, 'close'):
+            db.close()
 
 
 def main():
