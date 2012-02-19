@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+# This script is used to generate fancy charts and text tables
+# from a .json file produced via the '-r' argument of scripts/benchmark.
+import os
+import sys
+import json
+import optparse
+# I don't expect anyone else to run this script, but OrderedDict
+# requires python2.7.
+from collections import OrderedDict
+
+import numpy.numarray as na
+from matplotlib import pyplot as p
+import matplotlib
+import texttable
+
+
+def generate_charts(results, benchmark_to_use, results_filename):
+    labels = results['dbms']
+    font = {'size'   : 7}
+    matplotlib.rc('font', **font)
+
+    for name, benchmark in results['benchmarks'].iteritems():
+        data = [b[benchmark_to_use] for b in benchmark]
+        title = name
+        title += ('(numkeys=%(num_keys)s,keysize=%(key_size_bytes)s,'
+                  'valsize=%(value_size_bytes)s)' % results)
+        xlocations = na.array(range(len(data)))+0.5
+        width = 0.5
+        p.gcf().set_size_inches(5, 5)
+        p.bar(xlocations, data, width=width)
+        ymax = int(max(data)) + 1
+        p.yticks(range(0, ymax, ymax / 10))
+        p.ylim(0, ymax)
+        p.xticks(xlocations + width / 2, labels)
+        p.xlim(0, xlocations[-1] + width * 2)
+        p.ylabel(benchmark_to_use)
+        p.title(title)
+        p.gca().get_xaxis().tick_bottom()
+        p.gca().get_yaxis().tick_left()
+        p.savefig('docs/img/' + '%s_%s' %
+                  (os.path.splitext(results_filename)[0], name))
+        p.close('all')
+
+
+def generate_table(results, metric_to_use):
+    dbms = results['dbms']
+    title = ('n=%(num_keys)s,k=%(key_size_bytes)s,'
+             'v=%(value_size_bytes)s' % results)
+    t = texttable.Texttable(max_width=120)
+    t.set_cols_align(['l'] + ['r' for i in xrange(len(dbms))])
+    t.add_rows([
+        [title] + dbms,
+    ])
+    for name, benchmark in results['benchmarks'].iteritems():
+        t.add_row([name] + [b[metric_to_use] for b in benchmark])
+    print t.draw()
+
+
+def main():
+    parser = optparse.OptionParser()
+    parser.add_option('-t', '--table', action="store_true", default=False)
+    parser.add_option('-c', '--chart', action="store_true", default=False)
+    parser.add_option('-b', '--benchmark', default="ops_per_second")
+    opts, args = parser.parse_args()
+    if len(args) != 1:
+        sys.stderr.write("Supply the name of the .json report.")
+        sys.exit(1)
+    results = json.load(open(args[0]), object_pairs_hook=OrderedDict)
+    if opts.chart:
+        generate_charts(results, opts.benchmark, args[0])
+    if opts.table:
+        generate_table(results, opts.benchmark)
+
+
+if __name__ == '__main__':
+    main()
