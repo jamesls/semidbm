@@ -39,7 +39,7 @@ Contents
     :maxdepth: 2
 
     overview
-.. benchmarks
+    benchmarks
 
 
 API Documentation
