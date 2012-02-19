@@ -32,6 +32,12 @@ It was written with these things in mind:
   the design comparably simple.
 
 
+
+Post feedback and issues on
+`github issues <https://github.com/jamesls/semidbm/issues>`_, or check out the
+latest changes at the github `repo <https://github.com/jamesls/semidbm>`_.
+
+
 Contents
 --------
 

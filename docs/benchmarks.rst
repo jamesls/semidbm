@@ -25,8 +25,9 @@ The benchmark script is written in a way to be compatible with any module
 supporting the dbm interface.  Given the dbm interface isn't entirely
 standardized, this is what is required:
 
-* An `open()` function in the module (that behaves like `dumbdbm.open`,
-  `gdbm.open`, etc).
+* An `open()` function in the module (that behaves like
+  `dumbdbm.open <http://docs.python.org/library/dumbdbm.html#dumbdbm.open>`_,
+  `gdbm.open <http://docs.python.org/library/gdbm.html#gdbm.open>`_, etc).
 * The returned object from `open()` is a "dbm" like object.  All the object
   needs to support is `__getitem__`, `__setitem__`, `__delitem__`, and
   `close()`.
@@ -66,7 +67,8 @@ example, in order to benchmark Berkeley DB using the bsddb3 module, a
         db.open(filename, None, bsddb3.db.DB_HASH, flags)
         return db
 
-The `bsddb3.db.DB` object can now be benchmarked using::
+The `bsddb3.db.DB <http://www.jcea.es/programacion/pybsddb_doc/db.html>`_
+object can now be benchmarked using::
 
     scripts/benchmark -d bdb_minimal
 
@@ -203,7 +205,7 @@ times faster than gdbm.**
 
 Overall, semidbm's performance is comparable to the performance of other dbms
 with small keys and values, but is surprisingly faster than other dbms when
-using large values.  It's also clear that semidbm is faster than dumbdbm is all
+reading large values.  It's also clear that semidbm is faster than dumbdbm is all
 of the benchmarks shown here.
 
 

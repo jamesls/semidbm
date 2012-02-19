@@ -17,6 +17,7 @@ Semidbm offers a few improvements over dumbdbm including:
 * Index and data file compaction.  Free space can be reclaimed (though this
   only happens when the db is opened or whenever explicitly asked to do so
   using the `compact()` method).
+* Get/set/delete are require O(1) IO.
 
 
 There are also a few caveats to consider when using semidbm:
