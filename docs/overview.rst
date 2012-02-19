@@ -23,6 +23,7 @@ Semidbm offers a few improvements over dumbdbm including:
 There are also a few caveats to consider when using semidbm:
 
 * The entire index must fit in memory.
+* Not thread safe; can only be accessed by a single process.
 * While the performance is reasonable, it still will not beat one of the
   standard dbms (GNU dbm, Berkeley DB, etc).
 

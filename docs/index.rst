@@ -46,6 +46,7 @@ Contents
 
     overview
     benchmarks
+    changelog
 
 
 API Documentation
