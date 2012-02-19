@@ -11,6 +11,7 @@ the --dbm arg.
 import os
 import sys
 import stat
+import json
 import shutil
 import optparse
 import time
@@ -85,6 +86,10 @@ class StatsReporter(object):
                                 self.ops_per_second(),
                                 self.megabytes_per_second()))
 
+    @property
+    def name(self):
+        return self._name
+
 
 class Benchmarks(object):
     def __init__(self, options, tmpdir):
@@ -101,25 +106,18 @@ class Benchmarks(object):
     def run(self, dbm):
         print "Benchmarking:", dbm
         print self.options.print_options()
+        all_reports = []
         try:
-            report = self.fill_sequential(dbm)
-            report.print_report()
-
-            report = self.read_hot(dbm)
-            report.print_report()
-
-            report = self.read_sequential(dbm)
-            report.print_report()
-
-            report = self.read_random(dbm)
-            report.print_report()
-
-            report = self.delete_sequential(dbm)
-            report.print_report()
-
+            for name in ['fill_sequential', 'read_hot', 'read_sequential',
+                           'read_random', 'delete_sequential']:
+                method = getattr(self, name)
+                report = method(dbm)
+                report.print_report()
+                all_reports.append(report)
         finally:
             self.delete_dbm()
             print
+        return all_reports
 
     def fill_sequential(self, dbm):
         db = self._load_dbm(dbm)
@@ -252,6 +250,48 @@ class Benchmarks(object):
             db.close()
 
 
+def generate_report(filename, options, reports):
+    """Create a json report grouped by benchmarks rather than by dbm.
+
+    Since this is going to be used to autogenerate the
+    charts/tables, a comparison across dbms for a given benchmark
+    is more useful.  The output should look like::
+
+        {num_keys: 100, key_size_bytes: 16, value_size_bytes: 1000,
+         dbms: ['semidbm', 'gdbm'],
+         benchmarks:
+             [['fill_sequential', [
+                {total_time: 100, micros_per_op: 1,
+                 ops_per_second: 123, mb_per_second: 100}]],
+              ...
+             ]
+        }
+
+
+    """
+    # Generating a report requires python >= 2.7.
+    from collections import OrderedDict
+    output = {
+        'num_keys': options.num_keys,
+        'key_size_bytes': options.key_size_bytes,
+        'value_size_bytes': options.value_size_bytes
+    }
+    by_benchmarks = OrderedDict()
+    dbms = []
+    for dbm, benchmarks in reports:
+        dbms.append(dbm)
+        for benchmark in benchmarks:
+            by_benchmarks.setdefault(benchmark.name, []).append({
+                'total_time': benchmark.total_time(),
+                'micros_per_op': benchmark.micros_per_op(),
+                'ops_per_second': benchmark.ops_per_second(),
+                'megabytes_per_second': benchmark.megabytes_per_second(),
+            })
+    output['dbms'] = dbms
+    output['benchmarks'] = by_benchmarks
+    json.dump(output, open(filename, 'w'), indent=4)
+
+
 def main():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dbm', dest='dbms', action='append')
@@ -260,6 +300,8 @@ def main():
     parser.add_option('-n', '--num-keys', default=1000000, type=int)
     parser.add_option('-k', '--key-size-bytes', default=16, type=int)
     parser.add_option('-s', '--value-size-bytes', default=100, type=int)
+    parser.add_option('-r', '--report', help="Generate a summary report "
+                      "in json to specified location.")
     opts, args = parser.parse_args()
 
 
@@ -271,16 +313,19 @@ def main():
     options = Options(**opts.__dict__)
     tmpdir = tempfile.mkdtemp(prefix='dbmprofile')
     benchmarks = Benchmarks(options, tmpdir)
+    all_reports = []
     try:
         for dbm in dbms:
             try:
-                benchmarks.run(dbm)
+                all_reports.append((dbm.__name__, benchmarks.run(dbm)))
             except Exception, e:
                 sys.stderr.write(
                     "ERROR: exception caught when benchmarking %s: %s\n" %
                     (dbm, e))
     finally:
         shutil.rmtree(tmpdir)
+    if opts.report:
+        generate_report(opts.report, options, all_reports)
 
 
 if __name__ == '__main__':
