@@ -129,20 +129,86 @@ keys dumbdbm resulted in **104** ops/sec.
 
 The table below shows the actual numbers for the charts above.
 
-+-------------------+---------+--------+--------+---------+
-|                   | semidbm |  gdbm  |  bdb   | dumbdbm |
-+===================+=========+========+========+=========+
-| fill_sequential   |   73810 |  63177 |  73614 |    5460 |
-+-------------------+---------+--------+--------+---------+
-| read_hot          |  218651 | 202432 | 200111 |   59569 |
-+-------------------+---------+--------+--------+---------+
-| read_sequential   |  257668 | 417320 | 209696 |   62605 |
-+-------------------+---------+--------+--------+---------+
-| read_random       |  219962 | 406594 | 197690 |   59258 |
-+-------------------+---------+--------+--------+---------+
-| delete_sequential |  144265 | 119167 | 135137 |       0 |
-+-------------------+---------+--------+--------+---------+
++-------------------+-------------+------------+--------+---------+
+|                   | semidbm     |  gdbm      |  bdb   | dumbdbm |
++===================+=============+============+========+=========+
+| fill_sequential   |  **73810**  |  63177     |  73614 |    5460 |
++-------------------+-------------+------------+--------+---------+
+| read_hot          |  **218651** | 202432     | 200111 |   59569 |
++-------------------+-------------+------------+--------+---------+
+| read_sequential   |  257668     | **417320** | 209696 |   62605 |
++-------------------+-------------+------------+--------+---------+
+| read_random       |  219962     | **406594** | 197690 |   59258 |
++-------------------+-------------+------------+--------+---------+
+| delete_sequential |  **144265** | 119167     | 135137 |       0 |
++-------------------+-------------+------------+--------+---------+
 
+
+Benchmarking With Large Values
+------------------------------
+
+One area where semidbm benchmarks really well is when dealing with large
+values.  The same 5 benchmarks were repeated, but with only 1000 total keys,
+16 byte keys, and 100000 byte values.
+
+
+The first benchmark shows the ops/sec for 1000 sequential writes.
+
+
+.. image:: img/large_fill_sequential.png
+
+
+The second benchmark shows the ops/sec for repeatedly accessing 1% of the keys
+(randomly selected).
+
+
+.. image:: img/large_read_hot.png
+
+
+The third benchmark shows the ops/sec for sequentially reading all 1000 keys.
+
+.. image:: img/large_read_sequential.png
+
+The fourth benchmark shows the ops/sec for reading all 1000 keys in a
+randomly selected order.
+
+.. image:: img/large_read_random.png
+
+And the last benchmark shows the ops/sec for deleting all 1000 keys in
+the same order that they were added.
+
+.. image:: img/large_delete_sequential.png
+
+Below is the raw data used to generate the above charts.
+
++----------------------+------------+-----------+-----------+-------------+-----------+
+| n=1000,k=16,v=100000 |  semidbm   |    dbm    |   gdbm    | bdb_minimal |  dumbdbm  |
++======================+============+===========+===========+=============+===========+
+| fill_sequential      |   2653     |  2591     |  **5525** |    4677     |  1330     |
++----------------------+------------+-----------+-----------+-------------+-----------+
+| read_hot             |  **61016** |  8363     | 23104     |   11782     | 31624     |
++----------------------+------------+-----------+-----------+-------------+-----------+
+| read_sequential      |  **42421** |  8822     |  1508     |   11519     | 26757     |
++----------------------+------------+-----------+-----------+-------------+-----------+
+| read_random          |  **42133** |  8720     | 16442     |   11162     | 23778     |
++----------------------+------------+-----------+-----------+-------------+-----------+
+| delete_sequential    | **141379** | 21167     | 17695     |    7267     |   780     |
++----------------------+------------+-----------+-----------+-------------+-----------+
+
+You can see that with the exception of fill_sequential (in which the fastest
+module, gdbm, was roughly twice as fast as semidbm), semidbm completely
+outperforms all the other dbms.  In the case of read_sequential, semidbm's **28
+times faster than gdbm.**
+
+
+Overall, semidbm's performance is comparable to the performance of other dbms
+with small keys and values, but is surprisingly faster than other dbms when
+using large values.  It's also clear that semidbm is faster than dumbdbm is all
+of the benchmarks shown here.
+
+
+Running the Benchmarks
+----------------------
 
 You are encouraged to run the benchmarks yourself, to recreate the benchmark
 above, you can run::
