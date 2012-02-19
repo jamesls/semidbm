@@ -113,6 +113,10 @@ class Benchmarks(object):
 
             report = self.read_random(dbm)
             report.print_report()
+
+            report = self.delete_sequential(dbm)
+            report.print_report()
+
         finally:
             self.delete_dbm()
             print
@@ -204,6 +208,24 @@ class Benchmarks(object):
         return StatsReporter('read_random', times, total_bytes,
                              num_keys)
 
+    def delete_sequential(self, dbm):
+        # Assumes fill_sequential has been called.
+        db = self._load_dbm(dbm, 'c')
+        key_format = self.options.key_format
+        num_keys = self.options.num_keys
+
+        indices = [key_format % i for i in xrange(num_keys)]
+        t = time.time
+        times = [t()]
+        times_append = times.append
+        for i in xrange(num_keys):
+            del db[indices[i]]
+            times_append(t())
+        self._close_db(db)
+        total_bytes = (self.options.key_size_bytes * num_keys +
+                       self.options.value_size_bytes * num_keys)
+        return StatsReporter('delete_sequential', times, total_bytes, num_keys)
+
     def delete_dbm(self):
         # Just wipe out everything under tmpdir.
         self._rmtree(self.tmpdir)
@@ -215,7 +237,7 @@ class Benchmarks(object):
             full_path = os.path.join(tmpdir, path)
             mode = os.lstat(full_path).st_mode
             if stat.S_ISDIR(mode):
-                self._rmtree(full_path)
+                shutil.rmtree(full_path)
             else:
                 os.remove(full_path)
 
