@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import sys
 import shutil
 import unittest
 import tempfile
@@ -46,6 +47,7 @@ class TestSemiDBM(SemiDBMTest):
         db = self.open_db_file()
         db['foo'] = 'bar'
         self.assertEqual(db['foo'], 'bar')
+        db.close()
 
     def test_insert_close_retrieve(self):
         # This will verify loading the index.
@@ -55,6 +57,7 @@ class TestSemiDBM(SemiDBMTest):
 
         db2 = self.open_db_file()
         self.assertEqual(db2['foo'], 'bar')
+        db2.close()
 
     def test_insert_multiple(self):
         db = self.open_db_file()
@@ -64,6 +67,7 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db['one'], '1')
         self.assertEqual(db['two'], '2')
         self.assertEqual(db['three'], '3')
+        db.close()
 
     def test_intermixed_inserts_and_retrievals(self):
         db = self.open_db_file()
@@ -73,10 +77,12 @@ class TestSemiDBM(SemiDBMTest):
         db['three'] = '3'
         self.assertEqual(db['two'], '2')
         self.assertEqual(db['three'], '3')
+        db.close()
 
     def test_keyerror_raised_when_key_does_not_exist(self):
         db = self.open_db_file()
         self.assertRaises(KeyError, db.__getitem__, 'one')
+        db.close()
 
     def test_updates(self):
         db = self.open_db_file()
@@ -85,6 +91,7 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db['one'], 'bar')
         db['one'] = 'baz'
         self.assertEqual(db['one'], 'baz')
+        db.close()
 
     def test_updates_persist(self):
         db = self.open_db_file()
@@ -95,17 +102,20 @@ class TestSemiDBM(SemiDBMTest):
 
         db2 = self.open_db_file()
         self.assertEqual(db2['one'], 'baz')
+        db2.close()
 
     def test_contains(self):
         db = self.open_db_file()
         db['one'] = 'foo'
         self.assertTrue('one' in db)
+        db.close()
 
     def test_deletes(self):
         db = self.open_db_file()
         db['foo'] = 'bar'
         del db['foo']
         self.assertTrue('foo' not in db)
+        db.close()
 
     def test_delete_key_not_there_when_reopened(self):
         db = self.open_db_file()
@@ -117,6 +127,7 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertTrue('foo' not in db2)
         self.assertEqual(db2['bar'], 'bar')
+        db2.close()
 
     def test_compaction_of_index_file_on_open_deletes(self):
         db = self.open_db_file()
@@ -127,6 +138,7 @@ class TestSemiDBM(SemiDBMTest):
         db.close()
         db2 = self.open_db_file()
         self.assertEqual(os.stat(db2._index_filename).st_size, 0)
+        db2.close()
 
     def test_compaction_does_not_leave_behind_files(self):
         db = self.open_db_file()
@@ -156,6 +168,7 @@ class TestSemiDBM(SemiDBMTest):
         db.close()
         db2 = self.open_db_file()
         self.assertEqual(len(open(db2._index_filename).readlines()), 10)
+        db2.close()
 
     def test_keys_method(self):
         db = self.open_db_file()
@@ -163,6 +176,7 @@ class TestSemiDBM(SemiDBMTest):
         db['two'] = 'bar'
         db['three'] = 'bar'
         self.assertEqual(set(db.keys()), set(['one', 'two', 'three']))
+        db.close()
 
     def test_iterate(self):
         db = self.open_db_file()
@@ -170,6 +184,7 @@ class TestSemiDBM(SemiDBMTest):
         db['two'] = 'bar'
         db['three'] = 'baz'
         self.assertEqual(set(db), set(['one', 'two', 'three']))
+        db.close()
 
     def test_compaction_of_data_file_on_open_deletes(self):
         db = self.open_db_file()
@@ -192,6 +207,7 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db['one'], 'foo')
         self.assertEqual(db['two'], 'bar')
         self.assertEqual(db['three'], 'baz')
+        db.close()
 
     def test_compact_on_close(self):
         db = self.open_db_file()
@@ -210,6 +226,7 @@ class TestSemiDBM(SemiDBMTest):
 
         db2 = self.open_db_file()
         self.assertEqual(db2['after'], 'after')
+        db2.close()
 
     def test_loading_error_bad_format(self):
         dbdir = os.path.join(self.tempdir, 'bad.db')
@@ -238,8 +255,10 @@ class TestSemiDBM(SemiDBMTest):
         db = self.open_db_file()
         db['foo'] = 'bar'
         db.sync()
+        db.close()
         db2 = self.open_db_file()
         self.assertEqual(db2['foo'], 'bar')
+        db2.close()
 
 
 class TestReadOnlyMode(SemiDBMTest):
@@ -249,18 +268,22 @@ class TestReadOnlyMode(SemiDBMTest):
     def test_cant_setitem(self):
         db = self.open_db_file()
         self.assertRaises(semidbm.DBMError, db.__setitem__, 'foo', 'bar')
+        db.close()
 
     def test_cant_sync(self):
         db = self.open_db_file()
         self.assertRaises(semidbm.DBMError, db.sync)
+        db.close()
 
     def test_cant_compact(self):
         db = self.open_db_file()
         self.assertRaises(semidbm.DBMError, db.compact)
+        db.close()
 
     def test_cant_delitem(self):
         db = self.open_db_file()
         self.assertRaises(semidbm.DBMError, db.__delitem__, 'foo')
+        db.close()
 
     def test_close_never_compacts_index(self):
         db = self.open_db_file()
@@ -277,9 +300,11 @@ class TestReadOnlyMode(SemiDBMTest):
         db['foo'] = 'bar'
         db.close()
         # Open then close db immediately.
-        self.open_db_file().close()
+        db2 = self.open_db_file()
+        db2.close()
         read_only = self.open_db_file()
         self.assertEqual(read_only['foo'], 'bar')
+        read_only.close()
 
     def test_can_read_items(self):
         db = semidbm.open(self.dbdir, 'c')
@@ -292,6 +317,7 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertEqual(read_only['foo'], 'bar')
         self.assertEqual(read_only['bar'], 'baz')
         self.assertEqual(read_only['baz'], 'foo')
+        read_only.close()
 
     def test_key_does_not_exist(self):
         db = semidbm.open(self.dbdir, 'c')
@@ -300,6 +326,7 @@ class TestReadOnlyMode(SemiDBMTest):
 
         read_only = self.open_db_file()
         self.assertRaises(KeyError, read_only.__getitem__, 'bar')
+        read_only.close()
 
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
@@ -330,6 +357,7 @@ class TestWriteMode(SemiDBMTest):
 
         db_write_mode = semidbm.open(self.dbdir, 'w')
         self.assertEqual(db_write_mode['foo'], 'bar')
+        db_write_mode.close()
 
 
 class TestNewMode(SemiDBMTest):
@@ -337,17 +365,32 @@ class TestNewMode(SemiDBMTest):
         path = os.path.join(self.tempdir, 'foo.db')
         db = semidbm.open(path, 'n')
         db['foo'] = 'bar'
+        self.assertEqual(db['foo'], 'bar')
         db.close()
 
         # Opening the file again should basically blank out
         # any existing database.
         db = semidbm.open(path, 'n')
         self.assertEqual(db.keys(), [])
+        db.close()
 
 
 class TestInvalidModeArgument(unittest.TestCase):
     def test_invalid_open_arg_raises_exception(self):
         self.assertRaises(ValueError, semidbm.open, 'foo.db', 'z')
+
+
+class TestWindowsSemidbm(TestSemiDBM):
+    def setUp(self):
+        super(TestWindowsSemidbm, self).setUp()
+        self.original_platform = sys.platform
+        # The win32 specific code is compatible with posix platforms,
+        # so these tests can run on mac/linux/etc. just find.
+        sys.platform = 'win32'
+
+    def tearDown(self):
+        super(TestWindowsSemidbm, self).tearDown()
+        sys.platform = self.original_platform 
 
 
 if __name__ == '__main__':

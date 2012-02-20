@@ -19,6 +19,11 @@ Semidbm offers a few improvements over dumbdbm including:
   using the `compact()` method).
 * Get/set/delete are require O(1) IO.
 
+Like dumbdbm, semidbm is cross platform.  It has been tested on:
+
+* Linux (Ubuntu 11.10, debian)
+* Mac OS X (Lion)
+* Windows 7
 
 There are also a few caveats to consider when using semidbm:
 
