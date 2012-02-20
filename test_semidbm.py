@@ -365,6 +365,7 @@ class TestNewMode(SemiDBMTest):
         path = os.path.join(self.tempdir, 'foo.db')
         db = semidbm.open(path, 'n')
         db['foo'] = 'bar'
+        self.assertEqual(db['foo'], 'bar')
         db.close()
 
         # Opening the file again should basically blank out

@@ -70,8 +70,6 @@ class _SemiDBM(object):
     def _load_db(self, compact_index):
         self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
-        # buffering=0 makes the file objects unbuffered.
-        #self._index_filno = _open(self._index_filename, 'ab', buffering=0)
         self._index_fd = os.open(self._index_filename,
                                  os.O_WRONLY|os.O_CREAT|os.O_APPEND)
         self._data_fd = os.open(self._data_filename,
@@ -114,16 +112,15 @@ class _SemiDBM(object):
 
     def _compact_index(self, index):
         new_index_filename = self._index_filename + os.extsep + 'new'
-        # Should probably account for if the file already exists.
-        f = _open(new_index_filename, 'w')
+        new_data_fd = os.open(new_index_filename,
+                              os.O_WRONLY|os.O_CREAT|os.O_APPEND)
         for key in index:
             offset, value_length = index[key]
-            f.write('%s:%s%s:%s%s:%s\n' % (
+            os.write(new_data_fd, '%s:%s%s:%s%s:%s\n' % (
                 len(str(key)), key, len(str(offset)), offset,
                 len(str(value_length)), value_length))
-        f.flush()
-        os.fsync(f.fileno())
-        f.close()
+        os.fsync(new_data_fd)
+        os.close(new_data_fd)
         self._renamer(new_index_filename, self._index_filename)
 
     def _read_index(self, contents):
@@ -312,10 +309,6 @@ class _SemiDBMNew(_SemiDBM):
     def _load_db(self, compact_index):
         self._create_db_dir()
         self._remove_files_in_dbdir()
-        index_file = _open(self._index_filename, 'w')
-        data_file = _open(self._data_filename, 'w')
-        index_file.close()
-        data_file.close()
         super(_SemiDBMNew, self)._load_db(compact_index)
 
     def _remove_files_in_dbdir(self):
