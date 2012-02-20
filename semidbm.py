@@ -7,6 +7,7 @@ problems.
 
 """
 import os
+import sys
 import mmap
 import __builtin__
 
@@ -48,13 +49,18 @@ class _SemiDBM(object):
         (if needed) when the db is loaded.
 
     """
-    def __init__(self, dbdir, compact_on_open=True):
+    def __init__(self, dbdir, compact_on_open=True, renamer=None):
+        if renamer is None:
+            self._renamer = _Renamer()
+        else:
+            self._renamer = renamer
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
         self._index_filename = os.path.join(dbdir, 'data' + os.extsep + 'idx')
+        # The in memory index, mapping of key to (offset, size).
         self._index = None
-        self._index_file = None
-        self._data_file = None
+        self._index_fd = None
+        self._data_fd = None
         self._load_db(compact_on_open)
 
     def _create_db_dir(self):
@@ -65,21 +71,24 @@ class _SemiDBM(object):
         self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
         # buffering=0 makes the file objects unbuffered.
-        self._index_file = _open(self._index_filename, 'ab', buffering=0)
-        self._data_file = _open(self._data_filename, 'ab+', buffering=0)
+        #self._index_filno = _open(self._index_filename, 'ab', buffering=0)
+        self._index_fd = os.open(self._index_filename,
+                                 os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        self._data_fd = os.open(self._data_filename,
+                                 os.O_RDWR|os.O_CREAT|os.O_APPEND)
 
     def _load_index(self, filename, compact_on_open):
         # This method is only used upon instantiation to populate
         # the in memory index.
         if not os.path.exists(filename):
             return {}
-        contents = _open(filename, 'r')
         try:
-            return self._load_index_from_fileobj(contents, compact_on_open)
+            return self._load_index_from_fileobj(filename, compact_on_open)
         except ValueError:
             raise DBMLoadError("Bad index file: %s" % filename)
 
-    def _load_index_from_fileobj(self, contents, compact_on_open):
+    def _load_index_from_fileobj(self, filename, compact_on_open):
+        contents = _open(filename, 'r')
         index = {}
         needs_compaction = False
         for key_name, offset, size in self._read_index(contents):
@@ -98,6 +107,7 @@ class _SemiDBM(object):
                     index[key_name] = (offset, size)
                 else:
                     index[key_name] = (offset, size)
+        contents.close()
         if compact_on_open and needs_compaction:
             self._compact_index(index)
         return index
@@ -114,7 +124,7 @@ class _SemiDBM(object):
         f.flush()
         os.fsync(f.fileno())
         f.close()
-        os.rename(new_index_filename, self._index_filename)
+        self._renamer(new_index_filename, self._index_filename)
 
     def _read_index(self, contents):
         for line in contents:
@@ -128,10 +138,9 @@ class _SemiDBM(object):
             yield items
 
     def __getitem__(self, key):
-        data_file = self._data_file
         offset, size = self._index[key]
-        data_file.seek(offset)
-        return data_file.read(size)
+        os.lseek(self._data_fd, offset, os.SEEK_SET)
+        return os.read(self._data_fd, size)
 
     def __setitem__(self, key, value):
         # Write the new data out at the end of the file.
@@ -139,12 +148,13 @@ class _SemiDBM(object):
         # in the file.
         _len = len
         _str = str
-        data_file = self._data_file
-        data_file.write(value)
-        offset = data_file.tell() - _len(value)
+        os.write(self._data_fd, value)
+        # XXX: It might be faster to keep track of the current offset
+        # ourself instead of using lseek.
+        offset = os.lseek(self._data_fd, 0, os.SEEK_CUR) - _len(value)
         value_length = _len(value)
         # Update the index file.
-        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
+        os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
             _len(_str(key)), key, _len(_str(offset)), offset,
             _len(_str(value_length)), value_length))
         # Update the in memory index.
@@ -157,7 +167,7 @@ class _SemiDBM(object):
         offset = self._index[key][0]
         _len = len
         _str = str
-        self._index_file.write('%s:%s%s:%s%s:%s\n' % (
+        os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
             _len(_str(key)), key, _len(_str(offset)), offset,
             _len(_str(_DELETED)), _DELETED))
         del self._index[key]
@@ -188,8 +198,8 @@ class _SemiDBM(object):
         if compact:
             self.compact()
         self.sync()
-        self._index_file.close()
-        self._data_file.close()
+        os.close(self._index_fd)
+        os.close(self._data_fd)
 
     def sync(self):
         """Sync the db to disk.
@@ -204,10 +214,8 @@ class _SemiDBM(object):
         """
         # The files are opened unbuffered so we don't technically
         # need to flush the file objects.
-        self._data_file.flush()
-        self._index_file.flush()
-        os.fsync(self._data_file.fileno())
-        os.fsync(self._index_file.fileno())
+        os.fsync(self._data_fd)
+        os.fsync(self._index_fd)
 
     def compact(self):
         """Compact the db to reduce space.
@@ -230,12 +238,14 @@ class _SemiDBM(object):
         # reopening the files associated with this db.  This
         # implementation can certainly be more efficient, but compaction
         # is really slow anyways.
-        new_db = self.__class__(self._data_filename + os.extsep + 'compact')
+        new_db = self.__class__(os.path.join(self._dbdir, 'compact'))
         for key in self._index:
             new_db[key] = self[key]
         new_db.close()
-        os.rename(new_db._index_filename, self._index_filename)
-        os.rename(new_db._data_filename, self._data_filename)
+        os.close(self._index_fd)
+        os.close(self._data_fd)
+        self._renamer(new_db._index_filename, self._index_filename)
+        self._renamer(new_db._data_filename, self._data_filename)
         os.rmdir(new_db._dbdir)
         # The index is already compacted so we don't need to compact it.
         self._load_db(compact_index=False)
@@ -258,8 +268,8 @@ class _SemiDBMReadOnly(_SemiDBM):
         raise DBMError("Can't %s: db opened in read only mode." % method_name)
 
     def close(self, compact=False):
-        self._index_file.close()
-        self._data_file.close()
+        os.close(self._index_fd)
+        os.close(self._data_fd)
 
 
 class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
@@ -270,16 +280,13 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
     def _load_db(self, compact_index):
         self._create_db_dir()
         self._index = self._load_index(self._index_filename, compact_index)
-        # buffering=0 makes the file objects unbuffered.
-        self._index_file = _open(self._index_filename, 'ab', buffering=0)
-        self._data_file = _open(self._data_filename, 'ab+', buffering=0)
+        self._index_fd = os.open(self._index_filename,
+                                 os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        self._data_fd = os.open(self._data_filename,
+                                 os.O_RDONLY|os.O_CREAT|os.O_APPEND)
         if os.path.getsize(self._data_filename) > 0:
-            self._data_map = self._mmap_datafile(self._data_file)
-
-    def _mmap_datafile(self, data_file):
-        mapped = mmap.mmap(data_file.fileno(), 0, mmap.MAP_SHARED,
-                           mmap.PROT_READ)
-        return mapped
+            self._data_map = mmap.mmap(self._data_fd, 0,
+                                       access=mmap.ACCESS_READ)
 
     def __getitem__(self, key):
         offset, size = self._index[key]
@@ -320,6 +327,27 @@ class _SemiDBMNew(_SemiDBM):
             os.remove(self._index_filename)
 
 
+# These renamer classes are needed because windows
+# doesn't support atomic renames, and I won't want
+# non-window clients to suffer for this.  If you're on
+# windows, you don't get atomic renames.
+class _Renamer(object):
+    """An object that can rename files."""
+    def __call__(self, from_file, to_file):
+        os.rename(from_file, to_file)
+
+
+# Note that this also works on posix platforms as well.
+class _WindowsRenamer(object):
+    def __call__(self, from_file, to_file):
+        # os.rename(from_, to) will fail is the to file exists,
+        # so in order to accommodate this, the to_file is renamed,
+        # then from_file -> to_file, and then to_file is removed.
+        os.rename(to_file, to_file + os.extsep + 'tmprename')
+        os.rename(from_file, to_file)
+        os.remove(to_file + os.extsep + 'tmprename')
+
+
 def open(filename, flag='r', mode=0666):
     """Open a semidbm database.
 
@@ -349,13 +377,17 @@ def open(filename, flag='r', mode=0666):
         the dbm interface).
 
     """
+    if sys.platform.startswith('win'):
+        renamer = _WindowsRenamer()
+    else:
+        renamer = _Renamer()
     if flag == 'r':
-        return _SemiDBMReadOnly(filename)
+        return _SemiDBMReadOnly(filename, renamer=renamer)
     elif flag == 'c':
-        return _SemiDBM(filename)
+        return _SemiDBM(filename, renamer=renamer)
     elif flag == 'w':
-        return _SemiDBMReadWrite(filename)
+        return _SemiDBMReadWrite(filename, renamer=renamer)
     elif flag == 'n':
-        return _SemiDBMNew(filename)
+        return _SemiDBMNew(filename, renamer=renamer)
     else:
         raise ValueError("flag argument must be 'r', 'c', 'w', or 'n'")
