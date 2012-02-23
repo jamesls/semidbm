@@ -2,6 +2,12 @@
 Changelog
 =========
 
+0.3.1
+=====
+
+* Windows support.
+
+
 0.3.0
 =====
 
