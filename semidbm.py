@@ -9,6 +9,7 @@ problems.
 import os
 import sys
 import mmap
+from binascii import crc32
 import __builtin__
 
 _open = __builtin__.open
@@ -21,6 +22,10 @@ class DBMError(Exception):
 
 
 class DBMLoadError(DBMError):
+    pass
+
+
+class DBMChecksumError(DBMError):
     pass
 
 
@@ -137,7 +142,15 @@ class _SemiDBM(object):
     def __getitem__(self, key):
         offset, size = self._index[key]
         os.lseek(self._data_fd, offset, os.SEEK_SET)
-        return os.read(self._data_fd, size)
+        checksum_data = os.read(self._data_fd, size)
+        return self._verify_checksum_data(checksum_data)
+
+    def _verify_checksum_data(self, checksum_data):
+        checksum = int(checksum_data[:10])
+        value = checksum_data[10:]
+        if crc32(value) & 0xffffffff != checksum:
+            raise DBMChecksumError("Corrupt data detected: invalid checksum.")
+        return checksum_data[10:]
 
     def __setitem__(self, key, value):
         # Write the new data out at the end of the file.
@@ -145,11 +158,12 @@ class _SemiDBM(object):
         # in the file.
         _len = len
         _str = str
-        os.write(self._data_fd, value)
+        checksum = crc32(value) & 0xffffffff
+        os.write(self._data_fd, '%010d%s' % (checksum, value))
         # XXX: It might be faster to keep track of the current offset
         # ourself instead of using lseek.
-        offset = os.lseek(self._data_fd, 0, os.SEEK_CUR) - _len(value)
-        value_length = _len(value)
+        value_length = _len(value) + 10
+        offset = os.lseek(self._data_fd, 0, os.SEEK_CUR) - value_length
         # Update the index file.
         os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
             _len(_str(key)), key, _len(_str(offset)), offset,
@@ -287,7 +301,8 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
 
     def __getitem__(self, key):
         offset, size = self._index[key]
-        return self._data_map[offset:offset+size]
+        checksum_data = self._data_map[offset:offset+size]
+        return self._verify_checksum_data(checksum_data)
 
     def close(self, compact=False):
         super(_SemiDBMReadOnlyMMap, self).close()

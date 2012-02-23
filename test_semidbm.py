@@ -328,6 +328,21 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertRaises(KeyError, read_only.__getitem__, 'bar')
         read_only.close()
 
+    def test_checksum_failure(self):
+        db = semidbm.open(self.dbdir, 'c')
+        db['foo'] = 'bar'
+        db.close()
+        # Change the first digit of the checksum data.
+        data_file = self.open_data_file(mode='r')
+        new_digit = int(data_file.read(1)) + 1
+        data_file.close()
+        data_file = self.open_data_file(mode='w')
+        data_file.write(str(new_digit))
+        data_file.close()
+        db = self.open_db_file()
+        with self.assertRaises(semidbm.DBMChecksumError):
+            db['foo']
+
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self):
