@@ -18,8 +18,8 @@ class SemiDBMTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tempdir)
 
-    def open_db_file(self):
-        return semidbm.open(self.dbdir, 'c')
+    def open_db_file(self, **kwargs):
+        return semidbm.open(self.dbdir, 'c', **kwargs)
 
     def open_data_file(self, dbdir=None, mode='r'):
         if dbdir is None:
@@ -262,8 +262,8 @@ class TestSemiDBM(SemiDBMTest):
 
 
 class TestReadOnlyMode(SemiDBMTest):
-    def open_db_file(self):
-        return semidbm.open(self.dbdir, 'r')
+    def open_db_file(self, **kwargs):
+        return semidbm.open(self.dbdir, 'r', **kwargs)
 
     def test_cant_setitem(self):
         db = self.open_db_file()
@@ -339,14 +339,14 @@ class TestReadOnlyMode(SemiDBMTest):
         data_file = self.open_data_file(mode='w')
         data_file.write(str(new_digit))
         data_file.close()
-        db = self.open_db_file()
+        db = self.open_db_file(verify_checksums=True)
         with self.assertRaises(semidbm.DBMChecksumError):
             db['foo']
 
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
-    def open_db_file(self):
-        return semidbm._SemiDBMReadOnlyMMap(self.dbdir)
+    def open_db_file(self, **kwargs):
+        return semidbm._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
 
     def test_load_empty_db(self):
         db = semidbm.open(self.dbdir, 'c')

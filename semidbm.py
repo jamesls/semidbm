@@ -54,7 +54,8 @@ class _SemiDBM(object):
         (if needed) when the db is loaded.
 
     """
-    def __init__(self, dbdir, compact_on_open=True, renamer=None):
+    def __init__(self, dbdir, compact_on_open=True, renamer=None,
+                 verify_checksums=False):
         if renamer is None:
             self._renamer = _Renamer()
         else:
@@ -66,6 +67,7 @@ class _SemiDBM(object):
         self._index = None
         self._index_fd = None
         self._data_fd = None
+        self._verify_checksums = verify_checksums
         self._load_db(compact_on_open)
 
     def _create_db_dir(self):
@@ -143,7 +145,10 @@ class _SemiDBM(object):
         offset, size = self._index[key]
         os.lseek(self._data_fd, offset, os.SEEK_SET)
         checksum_data = os.read(self._data_fd, size)
-        return self._verify_checksum_data(checksum_data)
+        if self._verify_checksums:
+            return self._verify_checksum_data(checksum_data)
+        else:
+            return checksum_data[10:]
 
     def _verify_checksum_data(self, checksum_data):
         checksum = int(checksum_data[:10])
@@ -284,9 +289,9 @@ class _SemiDBMReadOnly(_SemiDBM):
 
 
 class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
-    def __init__(self, dbdir, compact_on_open=True):
+    def __init__(self, dbdir, **kwargs):
         self._data_map = None
-        super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, compact_on_open)
+        super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, **kwargs)
 
     def _load_db(self, compact_index):
         self._create_db_dir()
@@ -356,7 +361,13 @@ class _WindowsRenamer(object):
         os.remove(to_file + os.extsep + 'tmprename')
 
 
-def open(filename, flag='r', mode=0666):
+# The "dbm" interface is:
+#
+#     open(filename, flag='r', mode=0666)
+#
+# All the other args after this should have default values
+# so that this function remains compatible with the dbm interface.
+def open(filename, flag='r', mode=0666, verify_checksums=False):
     """Open a semidbm database.
 
     :param filename: The name of the db.  Note that for semidbm,
@@ -389,13 +400,14 @@ def open(filename, flag='r', mode=0666):
         renamer = _WindowsRenamer()
     else:
         renamer = _Renamer()
+    kwargs = {'renamer': renamer, 'verify_checksums': verify_checksums}
     if flag == 'r':
-        return _SemiDBMReadOnly(filename, renamer=renamer)
+        return _SemiDBMReadOnly(filename, **kwargs)
     elif flag == 'c':
-        return _SemiDBM(filename, renamer=renamer)
+        return _SemiDBM(filename, **kwargs)
     elif flag == 'w':
-        return _SemiDBMReadWrite(filename, renamer=renamer)
+        return _SemiDBMReadWrite(filename, **kwargs)
     elif flag == 'n':
-        return _SemiDBMNew(filename, renamer=renamer)
+        return _SemiDBMNew(filename, **kwargs)
     else:
         raise ValueError("flag argument must be 'r', 'c', 'w', or 'n'")
