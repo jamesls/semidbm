@@ -68,6 +68,7 @@ class _SemiDBM(object):
         self._index_fd = None
         self._data_fd = None
         self._verify_checksums = verify_checksums
+        self._current_offset = 0
         self._load_db(compact_on_open)
 
     def _create_db_dir(self):
@@ -81,6 +82,7 @@ class _SemiDBM(object):
                                  os.O_WRONLY|os.O_CREAT|os.O_APPEND)
         self._data_fd = os.open(self._data_filename,
                                  os.O_RDWR|os.O_CREAT|os.O_APPEND)
+        self._current_offset = os.lseek(self._data_fd, 0, os.SEEK_END)
 
     def _load_index(self, filename, compact_on_open):
         # This method is only used upon instantiation to populate
@@ -165,15 +167,14 @@ class _SemiDBM(object):
         _str = str
         checksum = crc32(value) & 0xffffffff
         os.write(self._data_fd, '%010d%s' % (checksum, value))
-        # XXX: It might be faster to keep track of the current offset
-        # ourself instead of using lseek.
         value_length = _len(value) + 10
-        offset = os.lseek(self._data_fd, 0, os.SEEK_CUR) - value_length
         # Update the index file.
+        offset = self._current_offset
         os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
             _len(_str(key)), key, _len(_str(offset)), offset,
             _len(_str(value_length)), value_length))
         # Update the in memory index.
+        self._current_offset += value_length
         self._index[key] = (offset, value_length)
 
     def __contains__(self, key):
