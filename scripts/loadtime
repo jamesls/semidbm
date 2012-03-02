@@ -25,7 +25,7 @@ def time_load(opts):
     print "done"
     db.close()
     start = time.time()
-    num_loads = 1000
+    num_loads = 10
     for  i in xrange(num_loads):
         db = o(path, 'c')
         db.close()
