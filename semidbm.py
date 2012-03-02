@@ -31,21 +31,25 @@ class DBMChecksumError(DBMError):
     pass
 
 
-# This basically works by keeping two files, one (the data file) that only
-# contains the data of the values associated with keys, and one (the index
-# file) which stores the offsets in the data file for the keys.  To add a new
-# value to the db, the value is written to the data file and the index file is
-# appended with the key name, the offset into the data file where the
-# associated data was written, and the size of the value.  The format of the
-# index is a very simple format: <size>:<item> where <size> is the length of
-# the item, and <item> is either the key, the offset, or the size of the value.
-# For example, adding a new entry in the index might look like this:
+# The basic idea is to have a single data file which data is only ever
+# appended to.  The basic format is:
 #
-# 3:foo3:1242:12\n
+# <size>:key<size>:<checksum><value>
+# 
+# For example, the key value pair "key: value" would be stored as:
 #
-# This will be read in as the tuple ('foo', '124', '12') which is interpreted
-# as the value for the key 'foo' is located 124 bytes into the data file and is
-# 12 bytes long.
+#     3:key15:0494360628value
+#
+# When the data file is loaded, an index of key -> (offset, size)
+# is created.  So if the above line was the only key in the db, the
+# index would be:
+#
+#     {'key': (8, 15)}
+#
+# Which says that the value of key is located at offset 8 with a size of
+# 15 (this is the value + sizeof checksum). The checksum is always a 10
+# digit integer.
+
 
 class _SemiDBM(object):
     """
