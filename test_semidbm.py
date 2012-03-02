@@ -2,6 +2,7 @@
 
 import os
 import sys
+import mmap
 import shutil
 import unittest
 import tempfile
@@ -238,6 +239,36 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertEqual(db2['after'], 'after')
         db2.close()
+
+
+class TestRemapping(SemiDBMTest):
+    def setUp(self):
+        super(TestRemapping, self).setUp()
+        self.original = semidbm._MAPPED_LOAD_PAGES
+        # Change the number of mapped pages to 1 so that we don't have to write
+        # as much data.  The logic in the code uses this constant, so changing
+        # the value of the constant won't affect the code logic, it'll just
+        # make the test run faster.
+        semidbm._MAPPED_LOAD_PAGES = 1
+
+    def tearDown(self):
+        super(TestRemapping, self).tearDown()
+        semidbm._MAPPED_LOAD_PAGES = self.original
+
+    def test_remap_required(self):
+        # Verify the loading buffer logic works.  This is
+        # really slow.
+        size = semidbm._MAPPED_LOAD_PAGES * mmap.ALLOCATIONGRANULARITY * 4
+        db = self.open_db_file()
+        # 100 byte values.
+        values = 'abcd' * 25
+        for i in xrange(size / 100):
+            db[str(i)] = values
+        db.close()
+
+        db2 = self.open_db_file()
+        for k in db2:
+            self.assertEqual(db2[k], values)
 
 
 class TestReadOnlyMode(SemiDBMTest):

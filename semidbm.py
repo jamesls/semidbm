@@ -12,9 +12,11 @@ import mmap
 from binascii import crc32
 import __builtin__
 
-_open = __builtin__.open
-_DELETED = -1
 __version__ = '0.3.1'
+_open = __builtin__.open
+
+_DELETED = -1
+_MAPPED_LOAD_PAGES = 300
 
 
 class DBMError(Exception):
@@ -81,7 +83,7 @@ class _SemiDBM(object):
     def _load_index(self, filename):
         # This method is only used upon instantiation to populate
         # the in memory index.
-        if not os.path.exists(filename):
+        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
             return {}
         try:
             return self._load_index_from_fileobj(filename)
@@ -109,21 +111,34 @@ class _SemiDBM(object):
     def _read_index(self, filename):
         # yields keyname, offset, size
         f = _open(filename, 'r')
-        contents = f.read()
+        contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        remap_size = mmap.ALLOCATIONGRANULARITY * _MAPPED_LOAD_PAGES
+        num_resizes = 0
         current = 0
-        while True:
-            key_index = contents.find(':', current)
-            if key_index == -1:
-                break
-            keysize = int(contents[current:key_index])
-            key = contents[key_index+1:key_index+1+keysize]
-            current = key_index + keysize
-            val_index = contents.find(':', current)
-            valsize = int(contents[current+1:val_index])
-            yield key, val_index + 1, valsize
-            if valsize == _DELETED:
-                valsize = 1
-            current = val_index + valsize + 1
+        try:
+            while True:
+                key_index = contents.find(':', current)
+                if key_index == -1:
+                    break
+                keysize = int(contents[current:key_index])
+                key = contents[key_index+1:key_index+1+keysize]
+                current = key_index + keysize
+                val_index = contents.find(':', current)
+                valsize = int(contents[current+1:val_index])
+                yield key, (remap_size * num_resizes) + val_index + 1, valsize
+                if valsize == _DELETED:
+                    valsize = 1
+                current = val_index + valsize + 1
+                if current >= remap_size:
+                    contents.close()
+                    num_resizes += 1
+                    contents = mmap.mmap(f.fileno(), 0,
+                                         access=mmap.ACCESS_READ,
+                                         offset=num_resizes * remap_size)
+                    current -= remap_size
+        finally:
+            contents.close()
+            f.close()
 
     def __getitem__(self, key):
         offset, size = self._index[key]
