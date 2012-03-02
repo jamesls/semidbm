@@ -2,6 +2,7 @@
 
 import os
 import sys
+import mmap
 import shutil
 import unittest
 import tempfile
@@ -18,8 +19,8 @@ class SemiDBMTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tempdir)
 
-    def open_db_file(self):
-        return semidbm.open(self.dbdir, 'c')
+    def open_db_file(self, **kwargs):
+        return semidbm.open(self.dbdir, 'c', **kwargs)
 
     def open_data_file(self, dbdir=None, mode='r'):
         if dbdir is None:
@@ -129,46 +130,19 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db2['bar'], 'bar')
         db2.close()
 
-    def test_compaction_of_index_file_on_open_deletes(self):
+    def test_multiple_deletes(self):
         db = self.open_db_file()
-        for i in xrange(10):
-            db[str(i)] = str(i)
-        for i in xrange(10):
-            del db[str(i)]
+        db['foo'] = 'foo'
+        del db['foo']
+        db['foo'] = 'foo'
+        del db['foo']
+        db['foo'] = 'foo'
+        del db['foo']
+        db['bar'] = 'bar'
         db.close()
         db2 = self.open_db_file()
-        self.assertEqual(os.stat(db2._index_filename).st_size, 0)
-        db2.close()
-
-    def test_compaction_does_not_leave_behind_files(self):
-        db = self.open_db_file()
-        before = len(os.listdir(self.dbdir))
-        for i in xrange(10):
-            db[str(i)] = str(i)
-        for i in xrange(10):
-            del db[str(i)]
-        db.close()
-        db2 = self.open_db_file()
-        db2.compact()
-        db2.close()
-        after = len(os.listdir(self.dbdir))
-        self.assertEqual(before, after, os.listdir(self.dbdir))
-
-    def test_compaction_of_index_file_on_open_updates(self):
-        # This is definitely implementation specific, but
-        # I can't think of a better way to validate
-        # update compaction in the index file.
-        db = self.open_db_file()
-        for i in xrange(10):
-            db[str(i)] = str(i)
-            db[str(i)] = str(i + 1)
-            db[str(i)] = str(i + 2)
-        # With 3 updates per key, the index file is 30 lines long.
-        # On compaction, the index file should only be 10 minutes long.
-        db.close()
-        db2 = self.open_db_file()
-        self.assertEqual(len(open(db2._index_filename).readlines()), 10)
-        db2.close()
+        self.assertTrue('foo' not in db2)
+        self.assertEqual(db2['bar'], 'bar')
 
     def test_keys_method(self):
         db = self.open_db_file()
@@ -186,14 +160,52 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(set(db), set(['one', 'two', 'three']))
         db.close()
 
-    def test_compaction_of_data_file_on_open_deletes(self):
+
+    def test_sync_contents(self):
+        # So there's not really a good way to test this, so
+        # I'm just making sure you can call it, and you can see the data.
         db = self.open_db_file()
-        db['key'] = 'original'
-        db['key'] = 'updated'
-        del db['key']
-        db.compact()
+        db['foo'] = 'bar'
+        db.sync()
         db.close()
-        self.assertEqual(len(open(db._data_filename).read()), 0)
+        db2 = self.open_db_file()
+        self.assertEqual(db2['foo'], 'bar')
+        db2.close()
+
+    def test_compaction_does_not_leave_behind_files(self):
+        db = self.open_db_file()
+        before = len(os.listdir(self.dbdir))
+        for i in xrange(10):
+            db[str(i)] = str(i)
+        for i in xrange(10):
+            del db[str(i)]
+        db.close()
+        db2 = self.open_db_file()
+        db2.compact()
+        db2.close()
+        after = len(os.listdir(self.dbdir))
+        self.assertEqual(before, after, os.listdir(self.dbdir))
+
+    def test_inserts_after_deletes(self):
+        db = self.open_db_file()
+        db['one'] = 'one'
+        del db['one']
+        db['two'] = 'two'
+
+        self.assertEqual(db['two'], 'two')
+
+    def test_mixed_updates_and_deletes(self):
+        db = self.open_db_file()
+        db['one'] = 'one'
+        db['CHECK'] = 'original'
+        db['two'] = 'two'
+        db['CHECK'] = 'updated'
+        del db['CHECK']
+        db['three'] = 'three'
+
+        self.assertEqual(db['one'], 'one')
+        self.assertEqual(db['two'], 'two')
+        self.assertEqual(db['three'], 'three')
 
     def test_compact_and_retrieve_data(self):
         db = self.open_db_file()
@@ -228,42 +240,40 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db2['after'], 'after')
         db2.close()
 
-    def test_loading_error_bad_format(self):
-        dbdir = os.path.join(self.tempdir, 'bad.db')
-        with self.open_index_file(dbdir=dbdir, mode='w') as f:
-            f.write("bad index file")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
 
-    def test_loading_error_bad_line(self):
-        dbdir = os.path.join(self.tempdir, 'bad.db')
-        with self.open_index_file(dbdir=dbdir, mode='w') as f:
-            # The first number should be 3 not 4, so
-            # a DBMLoadError is expected.
-            f.write("4:foo3:1242:12\n")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
+class TestRemapping(SemiDBMTest):
+    def setUp(self):
+        super(TestRemapping, self).setUp()
+        self.original = semidbm._MAPPED_LOAD_PAGES
+        # Change the number of mapped pages to 1 so that we don't have to write
+        # as much data.  The logic in the code uses this constant, so changing
+        # the value of the constant won't affect the code logic, it'll just
+        # make the test run faster.
+        semidbm._MAPPED_LOAD_PAGES = 1
 
-    def test_loading_error_missing_fields(self):
-        dbdir = os.path.join(self.tempdir, 'bad.db')
-        with self.open_index_file(dbdir=dbdir, mode='w') as f:
-            # Missing the size attribute (the third value of the line).
-            f.write("4:foo3:124\n4:bar3:189\n")
-        self.assertRaises(semidbm.DBMLoadError, semidbm.open, dbdir, 'c')
+    def tearDown(self):
+        super(TestRemapping, self).tearDown()
+        semidbm._MAPPED_LOAD_PAGES = self.original
 
-    def test_sync_contents(self):
-        # So there's not really a good way to test this, so
-        # I'm just making sure you can call it, and you can see the data.
+    def test_remap_required(self):
+        # Verify the loading buffer logic works.  This is
+        # really slow.
+        size = semidbm._MAPPED_LOAD_PAGES * mmap.ALLOCATIONGRANULARITY * 4
         db = self.open_db_file()
-        db['foo'] = 'bar'
-        db.sync()
+        # 100 byte values.
+        values = 'abcd' * 25
+        for i in xrange(size / 100):
+            db[str(i)] = values
         db.close()
+
         db2 = self.open_db_file()
-        self.assertEqual(db2['foo'], 'bar')
-        db2.close()
+        for k in db2:
+            self.assertEqual(db2[k], values)
 
 
 class TestReadOnlyMode(SemiDBMTest):
-    def open_db_file(self):
-        return semidbm.open(self.dbdir, 'r')
+    def open_db_file(self, **kwargs):
+        return semidbm.open(self.dbdir, 'r', **kwargs)
 
     def test_cant_setitem(self):
         db = self.open_db_file()
@@ -328,10 +338,30 @@ class TestReadOnlyMode(SemiDBMTest):
         self.assertRaises(KeyError, read_only.__getitem__, 'bar')
         read_only.close()
 
+    def test_checksum_failure(self):
+        db = semidbm.open(self.dbdir, 'c')
+        db['key'] = 'value'
+        db.close()
+        # Change the first digit of the checksum data.
+        data_file = self.open_data_file(mode='r')
+        # 3:key15:<checksum>value
+        # First checksum digit is 9 bytes into the file.
+        beginning = data_file.read()
+        new_digit = int(beginning[8]) + 1
+        data_file.close()
+        data_file = self.open_data_file(mode='w')
+        data_file.write(beginning[:8])
+        data_file.write(str(new_digit))
+        data_file.write(beginning[9:])
+        data_file.close()
+        db = self.open_db_file(verify_checksums=True)
+        with self.assertRaises(semidbm.DBMChecksumError):
+            db['key']
+
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
-    def open_db_file(self):
-        return semidbm._SemiDBMReadOnlyMMap(self.dbdir)
+    def open_db_file(self, **kwargs):
+        return semidbm._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
 
     def test_load_empty_db(self):
         db = semidbm.open(self.dbdir, 'c')
@@ -390,7 +420,7 @@ class TestWindowsSemidbm(TestSemiDBM):
 
     def tearDown(self):
         super(TestWindowsSemidbm, self).tearDown()
-        sys.platform = self.original_platform 
+        sys.platform = self.original_platform
 
 
 if __name__ == '__main__':

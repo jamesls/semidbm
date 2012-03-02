@@ -2,6 +2,14 @@
 Changelog
 =========
 
+0.4.0
+=====
+
+* Index and data file consolidated to a single file.
+* Checksums are written for all values.  Checksums can
+  be verified for every __getitem__ call (off by default).
+
+
 0.3.1
 =====
 
