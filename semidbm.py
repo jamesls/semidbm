@@ -382,6 +382,9 @@ def open(filename, flag='r', mode=0666, verify_checksums=False):
     :param mode: Not currently used (provided to be compatible with
         the dbm interface).
 
+    :param verify_checksums: Verify the checksums for each value
+        are correct on every __getitem__ call (defaults to False).
+
     """
     if sys.platform.startswith('win'):
         renamer = _WindowsRenamer()
