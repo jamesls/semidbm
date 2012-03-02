@@ -35,7 +35,7 @@ class DBMChecksumError(DBMError):
 # appended to.  The basic format is:
 #
 # <size>:key<size>:<checksum><value>
-# 
+#
 # For example, the key value pair "key: value" would be stored as:
 #
 #     3:key15:0494360628value
@@ -58,8 +58,7 @@ class _SemiDBM(object):
         does not exist it will be created.
 
     """
-    def __init__(self, dbdir, renamer=None,
-                 verify_checksums=False):
+    def __init__(self, dbdir, renamer=None, verify_checksums=False):
         if renamer is None:
             self._renamer = _Renamer()
         else:
@@ -291,9 +290,7 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
     def _load_db(self):
         self._create_db_dir()
         self._index = self._load_index(self._data_filename)
-        # TODO: O_APPEND???
-        self._data_fd = os.open(self._data_filename,
-                                 os.O_RDONLY|os.O_CREAT|os.O_APPEND)
+        self._data_fd = os.open(self._data_filename, os.O_RDONLY|os.O_CREAT)
         if os.path.getsize(self._data_filename) > 0:
             self._data_map = mmap.mmap(self._data_fd, 0,
                                        access=mmap.ACCESS_READ)
