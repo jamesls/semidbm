@@ -12,7 +12,7 @@ import mmap
 from binascii import crc32
 import __builtin__
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 _open = __builtin__.open
 
 _DELETED = -1
