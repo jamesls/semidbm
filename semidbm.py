@@ -47,14 +47,12 @@ class DBMChecksumError(DBMError):
 
 class _SemiDBM(object):
     """
-    
+
     :param dbdir: The directory containing the dbm files.  If the directory
         does not exist it will be created.
-    :param compact_on_open: If this value is True, the index is compacted
-        (if needed) when the db is loaded.
 
     """
-    def __init__(self, dbdir, compact_on_open=True, renamer=None,
+    def __init__(self, dbdir, renamer=None,
                  verify_checksums=False):
         if renamer is None:
             self._renamer = _Renamer()
@@ -62,43 +60,37 @@ class _SemiDBM(object):
             self._renamer = renamer
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
-        self._index_filename = os.path.join(dbdir, 'data' + os.extsep + 'idx')
         # The in memory index, mapping of key to (offset, size).
         self._index = None
-        self._index_fd = None
         self._data_fd = None
         self._verify_checksums = verify_checksums
         self._current_offset = 0
-        self._load_db(compact_on_open)
+        self._load_db()
 
     def _create_db_dir(self):
         if not os.path.exists(self._dbdir):
             os.makedirs(self._dbdir)
 
-    def _load_db(self, compact_index):
+    def _load_db(self):
         self._create_db_dir()
-        self._index = self._load_index(self._index_filename, compact_index)
-        self._index_fd = os.open(self._index_filename,
-                                 os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        self._index = self._load_index(self._data_filename)
         self._data_fd = os.open(self._data_filename,
                                  os.O_RDWR|os.O_CREAT|os.O_APPEND)
         self._current_offset = os.lseek(self._data_fd, 0, os.SEEK_END)
 
-    def _load_index(self, filename, compact_on_open):
+    def _load_index(self, filename):
         # This method is only used upon instantiation to populate
         # the in memory index.
         if not os.path.exists(filename):
             return {}
         try:
-            return self._load_index_from_fileobj(filename, compact_on_open)
-        except ValueError:
-            raise DBMLoadError("Bad index file: %s" % filename)
+            return self._load_index_from_fileobj(filename)
+        except ValueError, e:
+            raise DBMLoadError("Bad index file %s: %s" % (filename, e))
 
-    def _load_index_from_fileobj(self, filename, compact_on_open):
-        contents = _open(filename, 'r')
+    def _load_index_from_fileobj(self, filename):
         index = {}
-        needs_compaction = False
-        for key_name, offset, size in self._read_index(contents):
+        for key_name, offset, size in self._read_index(filename):
             size = int(size)
             offset = int(offset)
             if size == _DELETED:
@@ -107,41 +99,31 @@ class _SemiDBM(object):
                 # in the index, because a delete is only written to the index
                 # if the key already exists in the db.
                 del index[key_name]
-                needs_compaction = True
             else:
                 if key_name in index:
-                    needs_compaction = True
                     index[key_name] = (offset, size)
                 else:
                     index[key_name] = (offset, size)
-        contents.close()
-        if compact_on_open and needs_compaction:
-            self._compact_index(index)
         return index
 
-    def _compact_index(self, index):
-        new_index_filename = self._index_filename + os.extsep + 'new'
-        new_data_fd = os.open(new_index_filename,
-                              os.O_WRONLY|os.O_CREAT|os.O_APPEND)
-        for key in index:
-            offset, value_length = index[key]
-            os.write(new_data_fd, '%s:%s%s:%s%s:%s\n' % (
-                len(str(key)), key, len(str(offset)), offset,
-                len(str(value_length)), value_length))
-        os.fsync(new_data_fd)
-        os.close(new_data_fd)
-        self._renamer(new_index_filename, self._index_filename)
-
-    def _read_index(self, contents):
-        for line in contents:
-            start = 0
-            items = []
-            for _ in xrange(3):
-                end = line.find(':', start)
-                item_length = int(line[start:end])
-                items.append(line[end + 1:end + item_length + 1])
-                start = end + item_length + 1
-            yield items
+    def _read_index(self, filename):
+        # yields keyname, offset, size
+        f = _open(filename, 'r')
+        contents = f.read()
+        current = 0
+        while True:
+            key_index = contents.find(':', current)
+            if key_index == -1:
+                break
+            keysize = int(contents[current:key_index])
+            key = contents[key_index+1:key_index+1+keysize]
+            current = key_index + keysize
+            val_index = contents.find(':', current)
+            valsize = int(contents[current+1:val_index])
+            yield key, val_index + 1, valsize
+            if valsize == _DELETED:
+                valsize = 1
+            current = val_index + valsize + 1
 
     def __getitem__(self, key):
         offset, size = self._index[key]
@@ -161,33 +143,31 @@ class _SemiDBM(object):
 
     def __setitem__(self, key, value):
         # Write the new data out at the end of the file.
-        # Returns the offset of where this data is located
-        # in the file.
+        # Format is
+        # <checksum><keysize>:<key><valsize>:<val>
         _len = len
-        _str = str
+        # Everything except for the actual checksum + value
+        pre_value_blob = '%s:%s%s:' % (_len(key), key, _len(value) + 10)
+        pre_value_blob_size = _len(pre_value_blob)
         checksum = crc32(value) & 0xffffffff
-        os.write(self._data_fd, '%010d%s' % (checksum, value))
-        value_length = _len(value) + 10
-        # Update the index file.
-        offset = self._current_offset
-        os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
-            _len(_str(key)), key, _len(_str(offset)), offset,
-            _len(_str(value_length)), value_length))
+        blob = '%s%010d%s' % (pre_value_blob, checksum, value)
+        os.write(self._data_fd, blob)
         # Update the in memory index.
-        self._current_offset += value_length
-        self._index[key] = (offset, value_length)
+        self._index[key] = (self._current_offset + pre_value_blob_size,
+                            _len(value) + 10)
+        self._current_offset += len(blob)
 
     def __contains__(self, key):
         return key in self._index
 
     def __delitem__(self, key):
-        offset = self._index[key][0]
         _len = len
-        _str = str
-        os.write(self._index_fd, '%s:%s%s:%s%s:%s\n' % (
-            _len(_str(key)), key, _len(_str(offset)), offset,
-            _len(_str(_DELETED)), _DELETED))
+        # When the data blog is _DELETED:
+        # this indicates the key was deleted.
+        blob = '%s:%s%s:Z' % (_len(key), key, _DELETED)
+        os.write(self._data_fd, blob)
         del self._index[key]
+        self._current_offset += len(blob)
 
     def __iter__(self):
         for key in self._index:
@@ -215,7 +195,6 @@ class _SemiDBM(object):
         if compact:
             self.compact()
         self.sync()
-        os.close(self._index_fd)
         os.close(self._data_fd)
 
     def sync(self):
@@ -232,7 +211,6 @@ class _SemiDBM(object):
         # The files are opened unbuffered so we don't technically
         # need to flush the file objects.
         os.fsync(self._data_fd)
-        os.fsync(self._index_fd)
 
     def compact(self):
         """Compact the db to reduce space.
@@ -259,13 +237,11 @@ class _SemiDBM(object):
         for key in self._index:
             new_db[key] = self[key]
         new_db.close()
-        os.close(self._index_fd)
         os.close(self._data_fd)
-        self._renamer(new_db._index_filename, self._index_filename)
         self._renamer(new_db._data_filename, self._data_filename)
         os.rmdir(new_db._dbdir)
         # The index is already compacted so we don't need to compact it.
-        self._load_db(compact_index=False)
+        self._load_db()
 
 
 class _SemiDBMReadOnly(_SemiDBM):
@@ -285,7 +261,6 @@ class _SemiDBMReadOnly(_SemiDBM):
         raise DBMError("Can't %s: db opened in read only mode." % method_name)
 
     def close(self, compact=False):
-        os.close(self._index_fd)
         os.close(self._data_fd)
 
 
@@ -294,11 +269,10 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
         self._data_map = None
         super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, **kwargs)
 
-    def _load_db(self, compact_index):
+    def _load_db(self):
         self._create_db_dir()
-        self._index = self._load_index(self._index_filename, compact_index)
-        self._index_fd = os.open(self._index_filename,
-                                 os.O_WRONLY|os.O_CREAT|os.O_APPEND)
+        self._index = self._load_index(self._data_filename)
+        # TODO: O_APPEND???
         self._data_fd = os.open(self._data_filename,
                                  os.O_RDONLY|os.O_CREAT|os.O_APPEND)
         if os.path.getsize(self._data_filename) > 0:
@@ -317,28 +291,24 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
 
 
 class _SemiDBMReadWrite(_SemiDBM):
-    def _load_db(self, compact_index):
-        if not os.path.isfile(self._index_filename):
-            raise DBMError("Not a file: %s" % self._index_filename)
+    def _load_db(self):
         if not os.path.isfile(self._data_filename):
             raise DBMError("Not a file: %s" % self._data_filename)
 
-        super(_SemiDBMReadWrite, self)._load_db(compact_index)
+        super(_SemiDBMReadWrite, self)._load_db()
 
 
 class _SemiDBMNew(_SemiDBM):
-    def _load_db(self, compact_index):
+    def _load_db(self):
         self._create_db_dir()
         self._remove_files_in_dbdir()
-        super(_SemiDBMNew, self)._load_db(compact_index)
+        super(_SemiDBMNew, self)._load_db()
 
     def _remove_files_in_dbdir(self):
         # We want to create a new DB so we need to remove
-        # all of the existing files in the dbdir.
+        # any of the existing files in the dbdir.
         if os.path.exists(self._data_filename):
             os.remove(self._data_filename)
-        if os.path.exists(self._index_filename):
-            os.remove(self._index_filename)
 
 
 # These renamer classes are needed because windows
