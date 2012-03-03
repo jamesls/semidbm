@@ -116,17 +116,27 @@ class _SemiDBM(object):
         f = _open(filename, 'r')
         contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         remap_size = mmap.ALLOCATIONGRANULARITY * _MAPPED_LOAD_PAGES
+        # We need to track the max_index to use as the upper bound
+        # in the .find() calls to be compatible with python 2.6.
+        # There's a bug in python 2.6 where if an offset is specified
+        # along with a size of 0, then the size for mmap() is the size
+        # of the file instead of the size of the file - offset.  To
+        # fix this, we track this ourself and make sure we never go passed
+        # max_index.  If we don't do this, python2.6 will crash with
+        # a bus error (python2.7 works fine without this workaround).
+        # See http://bugs.python.org/issue10916 for more info.
+        max_index = os.path.getsize(filename)
         num_resizes = 0
         current = 0
         try:
             while True:
-                key_index = contents.find(':', current)
+                key_index = contents.find(':', current, max_index)
                 if key_index == -1:
                     break
                 keysize = int(contents[current:key_index])
                 key = contents[key_index+1:key_index+1+keysize]
                 current = key_index + keysize
-                val_index = contents.find(':', current)
+                val_index = contents.find(':', current, max_index)
                 valsize = int(contents[current+1:val_index])
                 yield key, (remap_size * num_resizes) + val_index + 1, valsize
                 if valsize == _DELETED:
@@ -139,6 +149,7 @@ class _SemiDBM(object):
                                          access=mmap.ACCESS_READ,
                                          offset=num_resizes * remap_size)
                     current -= remap_size
+                    max_index -= remap_size
         finally:
             contents.close()
             f.close()
