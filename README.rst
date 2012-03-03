@@ -36,27 +36,21 @@ Improvements
 Below are a list of some of the improvements semidbm makes over dumbdbm.
 
 
-Index and Data File In Sync
-===========================
+Single Data File
+================
 
-Both the index file and the data file are updated on every write operation.
-This ensures that the index and data file are always in sync with each other.
-This was a problem with dumbdbm.  The index file was out of sync with the
-data file as soon as updates were performed.  With semidbm, any create, update,
-or delete command will be written out to the index file.
+Instead of an index file and a data file, the index and data have been
+consolidated into a single file.  This single data file is always appended to,
+data written to the file is never modified.
 
 
-Index and Data File Compaction
-==============================
+Data File Compaction
+====================
 
 Semidbm uses a similar (but not identical) append only file format.  This has
 the potential to grow to large sizes as space is never reclaimed.  Semidbm
-addresses this in two ways:
-
-* Compact the index when instantiated.  Semidbm will compact the index if
-  necessary when the index is initially loaded.
-* Add a compact() method that compacts the index and the data file.  This
-  allows a client to compact the db whenever they need.
+addresses this by adding a ``compact()`` method that will rewrite the
+data file to a minimal size.
 
 
 Performance
@@ -74,7 +68,8 @@ Limitations
 ===========
 
 * Not thread safe; can't be accessed by multiple processes.
-* The entire index must fit in memory.
+* The entire index must fit in memory.  This essentially means that all of the
+  keys must fit in memory.
 
 
 Post feedback and issues on `github issues`_, or check out the
