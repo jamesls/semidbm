@@ -175,15 +175,17 @@ class _SemiDBM(object):
         # Format is
         # <checksum><keysize>:<key><valsize>:<val>
         _len = len
+        # Length of value plus 10 byte checksum.
+        value_length = _len(value) + 10
         # Everything except for the actual checksum + value
-        pre_value_blob = '%s:%s%s:' % (_len(key), key, _len(value) + 10)
+        pre_value_blob = '%s:%s%s:' % (_len(key), key, value_length)
         pre_value_blob_size = _len(pre_value_blob)
         checksum = crc32(value) & 0xffffffff
         blob = '%s%010d%s' % (pre_value_blob, checksum, value)
         os.write(self._data_fd, blob)
         # Update the in memory index.
         self._index[key] = (self._current_offset + pre_value_blob_size,
-                            _len(value) + 10)
+                            value_length)
         self._current_offset += len(blob)
 
     def __contains__(self, key):
