@@ -357,6 +357,12 @@ class TestReadOnlyMode(SemiDBMTest):
         db = self.open_db_file(verify_checksums=True)
         with self.assertRaises(semidbm.DBMChecksumError):
             db['key']
+        # If checksums are not enabled, an exception is not raised.
+        db = self.open_db_file(verify_checksums=False)
+        try:
+            db['key']
+        except semidbm.DBMChecksumError:
+            self.fail("Checksums were suppose to be disabled.")
 
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):

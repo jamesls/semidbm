@@ -158,10 +158,10 @@ class _SemiDBM(object):
         offset, size = self._index[key]
         os.lseek(self._data_fd, offset, os.SEEK_SET)
         checksum_data = os.read(self._data_fd, size)
-        if self._verify_checksums:
-            return self._verify_checksum_data(checksum_data)
-        else:
+        if not self._verify_checksums:
             return checksum_data[10:]
+        else:
+            return self._verify_checksum_data(checksum_data)
 
     def _verify_checksum_data(self, checksum_data):
         checksum = int(checksum_data[:10])
@@ -311,7 +311,10 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
     def __getitem__(self, key):
         offset, size = self._index[key]
         checksum_data = self._data_map[offset:offset+size]
-        return self._verify_checksum_data(checksum_data)
+        if not self._verify_checksums:
+            return checksum_data[10:]
+        else:
+            return self._verify_checksum_data(checksum_data)
 
     def close(self, compact=False):
         super(_SemiDBMReadOnlyMMap, self).close()
