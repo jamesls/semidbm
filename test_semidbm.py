@@ -6,7 +6,6 @@ import mmap
 import shutil
 import unittest
 import tempfile
-import StringIO
 
 import semidbm
 
