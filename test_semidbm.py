@@ -152,6 +152,14 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(set(db.keys()), set(['one', 'two', 'three']))
         db.close()
 
+    def test_values_method(self):
+        db = self.open_db_file()
+        db['one'] = 'one_value'
+        db['two'] = 'two_value'
+        db['three'] = 'three_value'
+        self.assertEqual(set(db.values()), set(['one_value', 'two_value',
+                                                'three_value']))
+
     def test_iterate(self):
         db = self.open_db_file()
         db['one'] = 'foo'

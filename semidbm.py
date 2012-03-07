@@ -212,6 +212,9 @@ class _SemiDBM(object):
         """
         return self._index.keys()
 
+    def values(self):
+        return [self[key] for key in self._index]
+
     def close(self, compact=False):
         """Close the db.
 
