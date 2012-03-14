@@ -108,8 +108,8 @@ class Benchmarks(object):
         print self.options.print_options()
         all_reports = []
         try:
-            for name in ['fill_sequential', 'read_hot', 'read_sequential',
-                           'read_random', 'delete_sequential']:
+            for name in ['fill_sequential', 'read_cold', 'read_sequential',
+                         'read_hot', 'read_random', 'delete_sequential']:
                 method = getattr(self, name)
                 report = method(dbm)
                 report.print_report()
@@ -147,7 +147,7 @@ class Benchmarks(object):
             (value_size * num_keys) + (self.options.key_size_bytes * num_keys),
             num_keys)
 
-    def read_sequential(self, dbm):
+    def read_sequential(self, dbm, name='read_sequential'):
         # Assumes fill_sequential has been called.
         db = self._load_dbm(dbm, 'r')
         key_format = self.options.key_format
@@ -163,7 +163,12 @@ class Benchmarks(object):
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
-        return StatsReporter('read_sequential', times, total_bytes, num_keys)
+        return StatsReporter(name, times, total_bytes, num_keys)
+
+    def read_cold(self, dbm):
+        # read_cold is intended to be called before read_sequential or any
+        # other reads to test the performance of a "cold" read.
+        return self.read_sequential(dbm, name='read_cold')
 
     def read_hot(self, dbm):
         # Assumes fill_sequential has been called.
@@ -173,12 +178,13 @@ class Benchmarks(object):
         unique_keys = int(num_keys * 0.01)
         indices = [self.options.key_format % i for i in random.sample(
             xrange(num_keys), unique_keys)]
+        indices = indices * (num_keys / unique_keys)
         db = self._load_dbm(dbm, 'r')
         t = time.time
         times = [t()]
         times_append = times.append
         for i in xrange(num_keys):
-            db[indices[i % unique_keys]]
+            db[indices[i]]
             times_append(t())
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
