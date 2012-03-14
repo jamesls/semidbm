@@ -251,7 +251,7 @@ class TestSemiDBM(SemiDBMTest):
 class TestRemapping(SemiDBMTest):
     def setUp(self):
         super(TestRemapping, self).setUp()
-        self.original = semidbm._MAPPED_LOAD_PAGES
+        self.original = semidbm.db._MAPPED_LOAD_PAGES
         # Change the number of mapped pages to 1 so that we don't have to write
         # as much data.  The logic in the code uses this constant, so changing
         # the value of the constant won't affect the code logic, it'll just
@@ -374,7 +374,7 @@ class TestReadOnlyMode(SemiDBMTest):
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self, **kwargs):
-        return semidbm._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
+        return semidbm.db._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
 
     def test_load_empty_db(self):
         db = semidbm.open(self.dbdir, 'c')
