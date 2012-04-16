@@ -59,30 +59,27 @@ class Options(object):
 
 
 class StatsReporter(object):
-    def __init__(self, name, times, total_bytes, total_ops):
+    def __init__(self, name, total_time, total_bytes, total_ops):
         self._name = name
-        self._times = times
+        self._total_time = total_time
         self._total_bytes = total_bytes
         self._total_ops = total_ops
 
-    def total_time(self):
-        return self._times[-1] - self._times[0]
-
     def micros_per_op(self):
         # Leveldb uses this, so it's useful to compare.
-        total_micros = self.total_time() * 1e6
+        total_micros = self._total_time * 1e6
         return total_micros / self._total_ops
 
     def ops_per_second(self):
-        return self._total_ops / float(self.total_time())
+        return self._total_ops / float(self._total_time)
 
     def megabytes_per_second(self):
-        return self._total_bytes / (1024.0 * 1024) / self.total_time()
+        return self._total_bytes / (1024.0 * 1024) / self._total_time
 
     def print_report(self):
         print "%-20s:" % self._name,
         print ("time: %9.3f,   micros/ops: %9.3f,   ops/s: %10.3f,  "
-               "MB/s: %10.3f" % (self.total_time(), self.micros_per_op(),
+               "MB/s: %10.3f" % (self._total_time, self.micros_per_op(),
                                 self.ops_per_second(),
                                 self.megabytes_per_second()))
 
@@ -129,21 +126,20 @@ class Benchmarks(object):
         num_keys = self.options.num_keys
 
         t = time.time
-        times = [t()]
-        times_append = times.append
         out = sys.stdout.write
         flush = sys.stdout.flush
+        start = t()
         for i in xrange(num_keys):
             db[key_format % i] = random_values[position:position+value_size]
-            times_append(t())
             position += value_size
             if position + value_size > maxlen:
                 position = 0
                 out("(%s/%s)\r" % (i, num_keys))
                 flush()
+        total = t() - start
         self._close_db(db)
         return StatsReporter(
-            'fill_sequential', times,
+            'fill_sequential', total,
             (value_size * num_keys) + (self.options.key_size_bytes * num_keys),
             num_keys)
 
@@ -155,15 +151,14 @@ class Benchmarks(object):
 
         indices = [key_format % i for i in xrange(num_keys)]
         t = time.time
-        times = [t()]
-        times_append = times.append
+        start = t()
         for i in xrange(num_keys):
             db[indices[i]]
-            times_append(t())
+        total = t() - start
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
-        return StatsReporter(name, times, total_bytes, num_keys)
+        return StatsReporter(name, total, total_bytes, num_keys)
 
     def read_cold(self, dbm):
         # read_cold is intended to be called before read_sequential or any
@@ -181,15 +176,14 @@ class Benchmarks(object):
         indices = indices * (num_keys / unique_keys)
         db = self._load_dbm(dbm, 'r')
         t = time.time
-        times = [t()]
-        times_append = times.append
+        start = t()
         for i in xrange(num_keys):
             db[indices[i]]
-            times_append(t())
+        total = t() - start
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
-        return StatsReporter('read_hot', times, total_bytes,
+        return StatsReporter('read_hot', total, total_bytes,
                              num_keys)
 
     def read_random(self, dbm):
@@ -201,15 +195,14 @@ class Benchmarks(object):
         random.shuffle(indices)
         db = self._load_dbm(dbm, 'r')
         t = time.time
-        times = [t()]
-        times_append = times.append
+        start = t()
         for i in xrange(num_keys):
             db[indices[i]]
-            times_append(t())
+        total = t() - start
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
-        return StatsReporter('read_random', times, total_bytes,
+        return StatsReporter('read_random', total, total_bytes,
                              num_keys)
 
     def delete_sequential(self, dbm):
@@ -220,15 +213,14 @@ class Benchmarks(object):
 
         indices = [key_format % i for i in xrange(num_keys)]
         t = time.time
-        times = [t()]
-        times_append = times.append
+        start = t()
         for i in xrange(num_keys):
             del db[indices[i]]
-            times_append(t())
+        total = t() - start
         self._close_db(db)
         total_bytes = (self.options.key_size_bytes * num_keys +
                        self.options.value_size_bytes * num_keys)
-        return StatsReporter('delete_sequential', times, total_bytes, num_keys)
+        return StatsReporter('delete_sequential', total, total_bytes, num_keys)
 
     def delete_dbm(self):
         # Just wipe out everything under tmpdir.
