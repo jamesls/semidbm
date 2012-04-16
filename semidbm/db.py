@@ -154,10 +154,11 @@ class _SemiDBM(object):
             contents.close()
             f.close()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, read=os.read, lseek=os.lseek,
+                    seek_set=os.SEEK_SET):
         offset, size = self._index[key]
-        os.lseek(self._data_fd, offset, os.SEEK_SET)
-        checksum_data = os.read(self._data_fd, size)
+        lseek(self._data_fd, offset, seek_set)
+        checksum_data = read(self._data_fd, size)
         if not self._verify_checksums:
             return checksum_data[10:]
         else:
@@ -170,19 +171,18 @@ class _SemiDBM(object):
             raise DBMChecksumError("Corrupt data detected: invalid checksum.")
         return checksum_data[10:]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write):
         # Write the new data out at the end of the file.
         # Format is
         # <checksum><keysize>:<key><valsize>:<val>
-        _len = len
         # Length of value plus 10 byte checksum.
-        value_length = _len(value) + 10
+        value_length = len(value) + 10
         # Everything except for the actual checksum + value
-        pre_value_blob = '%s:%s%s:' % (_len(key), key, value_length)
-        pre_value_blob_size = _len(pre_value_blob)
+        pre_value_blob = '%s:%s%s:' % (len(key), key, value_length)
+        pre_value_blob_size = len(pre_value_blob)
         checksum = crc32(value) & 0xffffffff
         blob = '%s%010d%s' % (pre_value_blob, checksum, value)
-        os.write(self._data_fd, blob)
+        write(self._data_fd, blob)
         # Update the in memory index.
         self._index[key] = (self._current_offset + pre_value_blob_size,
                             value_length)
@@ -191,12 +191,11 @@ class _SemiDBM(object):
     def __contains__(self, key):
         return key in self._index
 
-    def __delitem__(self, key):
-        _len = len
+    def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED):
         # When the data blog is _DELETED:
         # this indicates the key was deleted.
-        blob = '%s:%s%s:Z' % (_len(key), key, _DELETED)
-        os.write(self._data_fd, blob)
+        blob = '%s:%s%s:Z' % (len(key), key, deleted)
+        write(self._data_fd, blob)
         del self._index[key]
         self._current_offset += len(blob)
 
