@@ -26,7 +26,12 @@ A design goal of semidbm is to remain a pure python dbm.  This makes
 installation easy and allows semidbm to be used on any platform that
 supports python.
 
-Read the `semidbm docs <http://semidbm.readthedocs.org>`_ for more information.
+=============
+Official Docs
+=============
+
+Read the `semidbm docs <http://semidbm.readthedocs.org>`_ for more information
+and how to use semidbm.
 
 
 ============
