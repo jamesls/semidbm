@@ -10,7 +10,10 @@ import os
 import sys
 import mmap
 from binascii import crc32
-import __builtin__
+try:
+    import __builtin__
+except ImportError:
+    import builtins as __builtin__
 
 __version__ = '0.4.0'
 _open = __builtin__.open
@@ -90,7 +93,7 @@ class _SemiDBM(object):
             return {}
         try:
             return self._load_index_from_fileobj(filename)
-        except ValueError, e:
+        except ValueError as e:
             raise DBMLoadError("Bad index file %s: %s" % (filename, e))
 
     def _load_index_from_fileobj(self, filename):
@@ -130,13 +133,13 @@ class _SemiDBM(object):
         current = 0
         try:
             while True:
-                key_index = contents.find(':', current, max_index)
+                key_index = contents.find(b':', current, max_index)
                 if key_index == -1:
                     break
                 keysize = int(contents[current:key_index])
-                key = contents[key_index+1:key_index+1+keysize]
+                key = contents[key_index+1:key_index+1+keysize].decode('utf-8')
                 current = key_index + keysize
-                val_index = contents.find(':', current, max_index)
+                val_index = contents.find(b':', current, max_index)
                 valsize = int(contents[current+1:val_index])
                 yield key, (remap_size * num_resizes) + val_index + 1, valsize
                 if valsize == _DELETED:
@@ -160,9 +163,10 @@ class _SemiDBM(object):
         lseek(self._data_fd, offset, seek_set)
         checksum_data = read(self._data_fd, size)
         if not self._verify_checksums:
-            return checksum_data[10:]
+            data = checksum_data[10:]
         else:
-            return self._verify_checksum_data(checksum_data)
+            data = self._verify_checksum_data(checksum_data)
+        return data.decode('utf-8')
 
     def _verify_checksum_data(self, checksum_data):
         checksum = int(checksum_data[:10])
@@ -180,8 +184,9 @@ class _SemiDBM(object):
         # Everything except for the actual checksum + value
         pre_value_blob = '%s:%s%s:' % (len(key), key, value_length)
         pre_value_blob_size = len(pre_value_blob)
-        checksum = crc32(value) & 0xffffffff
+        checksum = crc32(value.encode('utf-8')) & 0xffffffff
         blob = '%s%010d%s' % (pre_value_blob, checksum, value)
+        blob = blob.encode('utf-8')
         write(self._data_fd, blob)
         # Update the in memory index.
         self._index[key] = (self._current_offset + pre_value_blob_size,
@@ -195,6 +200,7 @@ class _SemiDBM(object):
         # When the data blog is _DELETED:
         # this indicates the key was deleted.
         blob = '%s:%s%s:Z' % (len(key), key, deleted)
+        blob = blob.encode('utf-8')
         write(self._data_fd, blob)
         del self._index[key]
         self._current_offset += len(blob)
@@ -314,9 +320,10 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
         offset, size = self._index[key]
         checksum_data = self._data_map[offset:offset+size]
         if not self._verify_checksums:
-            return checksum_data[10:]
+            data = checksum_data[10:]
         else:
-            return self._verify_checksum_data(checksum_data)
+            data = self._verify_checksum_data(checksum_data)
+        return data.decode('utf-8')
 
     def close(self, compact=False):
         super(_SemiDBMReadOnlyMMap, self).close()
@@ -368,11 +375,11 @@ class _WindowsRenamer(object):
 
 # The "dbm" interface is:
 #
-#     open(filename, flag='r', mode=0666)
+#     open(filename, flag='r', mode=0o666)
 #
 # All the other args after this should have default values
 # so that this function remains compatible with the dbm interface.
-def open(filename, flag='r', mode=0666, verify_checksums=False):
+def open(filename, flag='r', mode=0o666, verify_checksums=False):
     """Open a semidbm database.
 
     :param filename: The name of the db.  Note that for semidbm,

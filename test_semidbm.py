@@ -182,9 +182,9 @@ class TestSemiDBM(SemiDBMTest):
     def test_compaction_does_not_leave_behind_files(self):
         db = self.open_db_file()
         before = len(os.listdir(self.dbdir))
-        for i in xrange(10):
+        for i in range(10):
             db[str(i)] = str(i)
-        for i in xrange(10):
+        for i in range(10):
             del db[str(i)]
         db.close()
         db2 = self.open_db_file()
@@ -269,7 +269,7 @@ class TestRemapping(SemiDBMTest):
         db = self.open_db_file()
         # 100 byte values.
         values = 'abcd' * 25
-        for i in xrange(size / 100):
+        for i in range(int(size / 100)):
             db[str(i)] = values
         db.close()
 
@@ -382,7 +382,7 @@ class TestReadOnlyModeMMapped(TestReadOnlyMode):
         empty_db = self.open_db_file()
         keys = empty_db.keys()
         empty_db.close()
-        self.assertEqual(keys, [])
+        self.assertEqual(list(keys), [])
 
 
 class TestWriteMode(SemiDBMTest):
@@ -414,7 +414,7 @@ class TestNewMode(SemiDBMTest):
         # Opening the file again should basically blank out
         # any existing database.
         db = semidbm.open(path, 'n')
-        self.assertEqual(db.keys(), [])
+        self.assertEqual(list(db.keys()), [])
         db.close()
 
 
