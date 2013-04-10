@@ -137,7 +137,7 @@ class _SemiDBM(object):
                 if key_index == -1:
                     break
                 keysize = int(contents[current:key_index])
-                key = contents[key_index+1:key_index+1+keysize].decode('utf-8')
+                key = contents[key_index+1:key_index+1+keysize]
                 current = key_index + keysize
                 val_index = contents.find(b':', current, max_index)
                 valsize = int(contents[current+1:val_index])
@@ -159,6 +159,8 @@ class _SemiDBM(object):
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
                     seek_set=os.SEEK_SET):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         offset, size = self._index[key]
         lseek(self._data_fd, offset, seek_set)
         checksum_data = read(self._data_fd, size)
@@ -166,7 +168,7 @@ class _SemiDBM(object):
             data = checksum_data[10:]
         else:
             data = self._verify_checksum_data(checksum_data)
-        return data.decode('utf-8')
+        return data
 
     def _verify_checksum_data(self, checksum_data):
         checksum = int(checksum_data[:10])
@@ -176,17 +178,25 @@ class _SemiDBM(object):
         return checksum_data[10:]
 
     def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
+        if isinstance(value, str):
+            value = value.encode('utf-8')
         # Write the new data out at the end of the file.
         # Format is
         # <checksum><keysize>:<key><valsize>:<val>
         # Length of value plus 10 byte checksum.
         value_length = len(value) + 10
         # Everything except for the actual checksum + value
-        pre_value_blob = '%s:%s%s:' % (len(key), key, value_length)
+        pre_value_blob = bytearray()
+        pre_value_blob.extend(("%s:" % len(key)).encode('utf-8'))
+        pre_value_blob.extend(key)
+        pre_value_blob.extend(("%s:" % value_length).encode('utf-8'))
         pre_value_blob_size = len(pre_value_blob)
-        checksum = crc32(value.encode('utf-8')) & 0xffffffff
-        blob = '%s%010d%s' % (pre_value_blob, checksum, value)
-        blob = blob.encode('utf-8')
+        checksum = crc32(value) & 0xffffffff
+        pre_value_blob.extend(("%010d" % checksum).encode('utf-8'))
+        pre_value_blob.extend(value)
+        blob = pre_value_blob
         write(self._data_fd, blob)
         # Update the in memory index.
         self._index[key] = (self._current_offset + pre_value_blob_size,
@@ -197,10 +207,14 @@ class _SemiDBM(object):
         return key in self._index
 
     def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         # When the data blog is _DELETED:
         # this indicates the key was deleted.
-        blob = '%s:%s%s:Z' % (len(key), key, deleted)
-        blob = blob.encode('utf-8')
+        blob = bytearray()
+        blob.extend(('%s:' % len(key)).encode('utf-8'))
+        blob.extend(key)
+        blob.extend(('%s:Z' % deleted).encode('utf-8'))
         write(self._data_fd, blob)
         del self._index[key]
         self._current_offset += len(blob)
@@ -317,13 +331,15 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
                                        access=mmap.ACCESS_READ)
 
     def __getitem__(self, key):
+        if isinstance(key, str):
+            key = key.encode('utf-8')
         offset, size = self._index[key]
         checksum_data = self._data_map[offset:offset+size]
         if not self._verify_checksums:
             data = checksum_data[10:]
         else:
             data = self._verify_checksum_data(checksum_data)
-        return data.decode('utf-8')
+        return data
 
     def close(self, compact=False):
         super(_SemiDBMReadOnlyMMap, self).close()
