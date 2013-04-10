@@ -17,6 +17,7 @@ import optparse
 import time
 import tempfile
 import random
+import traceback
 
 try:
     _range = xrange
@@ -322,6 +323,7 @@ def main():
             try:
                 all_reports.append((dbm.__name__, benchmarks.run(dbm)))
             except Exception as e:
+                traceback.print_exc()
                 sys.stderr.write(
                     "ERROR: exception caught when benchmarking %s: %s\n" %
                     (dbm, e))
