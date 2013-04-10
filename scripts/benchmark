@@ -31,6 +31,7 @@ _potential_dbms = ['dbhash', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
 
 ADAPTER_DIR = os.path.join(os.path.dirname(__file__), 'adapters')
 sys.path.append(ADAPTER_DIR)
+out = sys.stdout.write
 
 
 def set_dbms(dbms):
@@ -83,9 +84,9 @@ class StatsReporter(object):
         return self._total_bytes / (1024.0 * 1024) / self._total_time
 
     def print_report(self):
-        print("%-20s:" % self._name)
-        print("time: %9.3f,   micros/ops: %9.3f,   ops/s: %10.3f,  "
-              "MB/s: %10.3f" % (self._total_time, self.micros_per_op(),
+        out("%-20s:" % self._name)
+        out(" time: %9.3f,   micros/ops: %9.3f,   ops/s: %10.3f,  "
+              "MB/s: %10.3f\n" % (self._total_time, self.micros_per_op(),
                                 self.ops_per_second(),
                                 self.megabytes_per_second()))
 
@@ -101,7 +102,7 @@ class Benchmarks(object):
         self.random_values = self._generate_random_string(1024 * 1024)
 
     def _generate_random_string(self, string_size):
-        print("Generating random data.")
+        out("Generating random data.\n")
         c = chr
         rand = random.randint
         return ''.join(c(rand(0, 255)) for i in _range(string_size))
@@ -179,7 +180,7 @@ class Benchmarks(object):
         unique_keys = int(num_keys * 0.01)
         indices = [self.options.key_format % i for i in random.sample(
             _range(num_keys), unique_keys)]
-        indices = indices * (num_keys / unique_keys)
+        indices = indices * (int(num_keys / unique_keys))
         db = self._load_dbm(dbm, 'r')
         t = time.time
         start = t()
