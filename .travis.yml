@@ -1,0 +1,14 @@
+language: python
+python:
+  - "2.6"
+  - "2.7"
+  - "3.3"
+install:
+  - pip install coverage python-coveralls --use-mirrors
+script:
+  - coverage erase
+  - coverage run --source semidbm test_semidbm.py
+notifications:
+  email:
+    - js@jamesls.com
+after_success: coveralls
