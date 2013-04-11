@@ -2,6 +2,9 @@
 Overview
 ========
 
+.. image:: https://secure.travis-ci.org/jamesls/semidbm.png?branch=master
+   :target: http://travis-ci.org/jamesls/semidbm
+
 SemiDBM is an attempt at improving the dumbdbm in the python standard library.
 It's a slight improvement in both performance and in durability.  It can be
 used anywhere dumbdbm would be appropriate to use, which is basically when you
