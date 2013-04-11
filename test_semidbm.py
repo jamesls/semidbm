@@ -4,8 +4,11 @@ import os
 import sys
 import mmap
 import shutil
-import unittest
 import tempfile
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 import semidbm
 
