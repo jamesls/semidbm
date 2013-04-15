@@ -163,8 +163,8 @@ class _SemiDBM(object):
             f.close()
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
-                    seek_set=os.SEEK_SET):
-        if isinstance(key, _str_type):
+                    seek_set=os.SEEK_SET, str_type=_str_type):
+        if isinstance(key, str_type):
             key = key.encode('utf-8')
         offset, size = self._index[key]
         lseek(self._data_fd, offset, seek_set)
@@ -182,10 +182,11 @@ class _SemiDBM(object):
             raise DBMChecksumError("Corrupt data detected: invalid checksum.")
         return checksum_data[10:]
 
-    def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write):
-        if isinstance(key, _str_type):
+    def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write,
+                    str_type=_str_type):
+        if isinstance(key, str_type):
             key = key.encode('utf-8')
-        if isinstance(value, _str_type):
+        if isinstance(value, str_type):
             value = value.encode('utf-8')
         # Write the new data out at the end of the file.
         # Format is
@@ -211,8 +212,9 @@ class _SemiDBM(object):
     def __contains__(self, key):
         return key in self._index
 
-    def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED):
-        if isinstance(key, _str_type):
+    def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED,
+                    str_type=_str_type):
+        if isinstance(key, str_type):
             key = key.encode('utf-8')
         # When the data blog is _DELETED:
         # this indicates the key was deleted.
@@ -335,8 +337,8 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
             self._data_map = mmap.mmap(self._data_fd, 0,
                                        access=mmap.ACCESS_READ)
 
-    def __getitem__(self, key):
-        if isinstance(key, _str_type):
+    def __getitem__(self, key, str_type=_str_type):
+        if isinstance(key, str_type):
             key = key.encode('utf-8')
         offset, size = self._index[key]
         checksum_data = self._data_map[offset:offset+size]
