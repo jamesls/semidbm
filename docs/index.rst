@@ -49,13 +49,14 @@ Contents
     changelog
 
 
-API Documentation
------------------
+Developer Documentation
+-----------------------
 
 .. toctree::
     :maxdepth: 2
 
     api_semidbm
+    fileformat
 
 
 Indices and tables
