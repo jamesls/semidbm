@@ -431,7 +431,7 @@ class TestWindowsSemidbm(TestSemiDBM):
         super(TestWindowsSemidbm, self).setUp()
         self.original_platform = sys.platform
         # The win32 specific code is compatible with posix platforms,
-        # so these tests can run on mac/linux/etc. just find.
+        # so these tests can run on mac/linux/etc. just fine.
         sys.platform = 'win32'
 
     def tearDown(self):
