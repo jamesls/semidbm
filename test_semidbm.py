@@ -374,6 +374,12 @@ class TestReadOnlyMode(SemiDBMTest):
         except semidbm.DBMChecksumError:
             self.fail("Checksums were suppose to be disabled.")
 
+    def test_unicode_chars(self):
+        db = semidbm.open(self.dbdir, 'c')
+        # cafe with the e-accute.
+        db[b'caf\xc3\xa9'] = b'caf\xc3\xa9'
+        self.assertEqual(db[b'caf\xc3\xa9'], b'caf\xc3\xa9')
+
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self, **kwargs):
