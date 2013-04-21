@@ -105,7 +105,7 @@ class Benchmarks(object):
         out("Generating random data.\n")
         c = chr
         rand = random.randint
-        return ''.join(c(rand(0, 255)) for i in _range(string_size))
+        return bytes([rand(0, 255) for i in _range(string_size)])
 
     def run(self, dbm):
         print("Benchmarking:", dbm)
@@ -131,13 +131,14 @@ class Benchmarks(object):
         position = 0
         value_size = self.options.value_size_bytes
         num_keys = self.options.num_keys
+        indices = [(key_format % i).encode('utf-8') for i in _range(num_keys)]
 
         t = time.time
         out = sys.stdout.write
         flush = sys.stdout.flush
         start = t()
         for i in _range(num_keys):
-            db[key_format % i] = random_values[position:position+value_size]
+            db[indices[i]] = random_values[position:position+value_size]
             position += value_size
             if position + value_size > maxlen:
                 position = 0
@@ -156,7 +157,7 @@ class Benchmarks(object):
         key_format = self.options.key_format
         num_keys = self.options.num_keys
 
-        indices = [key_format % i for i in _range(num_keys)]
+        indices = [(key_format % i).encode('utf-8') for i in _range(num_keys)]
         t = time.time
         start = t()
         for i in _range(num_keys):
@@ -178,8 +179,8 @@ class Benchmarks(object):
         # This should test the effectiveness of any caching being used.
         num_keys = self.options.num_keys
         unique_keys = int(num_keys * 0.01)
-        indices = [self.options.key_format % i for i in random.sample(
-            _range(num_keys), unique_keys)]
+        indices = [(self.options.key_format % i).encode('utf-8')
+                   for i in random.sample(_range(num_keys), unique_keys)]
         indices = indices * (int(num_keys / unique_keys))
         db = self._load_dbm(dbm, 'r')
         t = time.time
@@ -198,7 +199,7 @@ class Benchmarks(object):
         # aren't ordered, but other dbms might be impacted.
         num_keys = self.options.num_keys
         key_format = self.options.key_format
-        indices = [key_format % i for i in range(num_keys)]
+        indices = [(key_format % i).encode('utf-8') for i in range(num_keys)]
         random.shuffle(indices)
         db = self._load_dbm(dbm, 'r')
         t = time.time
@@ -218,7 +219,7 @@ class Benchmarks(object):
         key_format = self.options.key_format
         num_keys = self.options.num_keys
 
-        indices = [key_format % i for i in _range(num_keys)]
+        indices = [(key_format % i).encode('utf-8') for i in _range(num_keys)]
         t = time.time
         start = t()
         for i in _range(num_keys):
