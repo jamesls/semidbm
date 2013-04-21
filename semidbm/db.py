@@ -10,6 +10,7 @@ import os
 import sys
 import mmap
 from binascii import crc32
+import struct
 try:
     import __builtin__
 except ImportError:
@@ -137,19 +138,20 @@ class _SemiDBM(object):
         num_resizes = 0
         current = 0
         try:
-            while True:
-                key_index = contents.find(b':', current, max_index)
-                if key_index == -1:
-                    break
-                keysize = int(contents[current:key_index])
-                key = contents[key_index+1:key_index+1+keysize]
-                current = key_index + keysize
-                val_index = contents.find(b':', current, max_index)
-                valsize = int(contents[current+1:val_index])
-                yield key, (remap_size * num_resizes) + val_index + 1, valsize
-                if valsize == _DELETED:
-                    valsize = 1
-                current = val_index + valsize + 1
+            while current != max_index:
+                key_size, val_size = struct.unpack(
+                    '!ii', contents[current:current+8])
+                #if key_index == -1:
+                #    break
+                key = contents[current+8:current+8+key_size]
+                yield (key,
+                       (remap_size * num_resizes) + current + 8 + key_size,
+                       val_size)
+                if val_size == _DELETED:
+                    val_size = 0
+                # Also need to skip past the 4 byte checksum, hence
+                # the '+ 4' at the end
+                current = current + 8 + key_size + val_size + 4
                 if current >= remap_size:
                     contents.close()
                     num_resizes += 1
@@ -163,65 +165,70 @@ class _SemiDBM(object):
             f.close()
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
-                    seek_set=os.SEEK_SET, str_type=_str_type):
+                    seek_set=os.SEEK_SET, str_type=_str_type,
+                    isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
         offset, size = self._index[key]
         lseek(self._data_fd, offset, seek_set)
-        checksum_data = read(self._data_fd, size)
         if not self._verify_checksums:
-            data = checksum_data[10:]
+            return read(self._data_fd, size)
         else:
-            data = self._verify_checksum_data(checksum_data)
-        return data
+            # Checksum is at the end of the value.
+            data = read(self._data_fd, size + 4)
+            return self._verify_checksum_data(key, data)
 
-    def _verify_checksum_data(self, checksum_data):
-        checksum = int(checksum_data[:10])
-        value = checksum_data[10:]
-        if crc32(value) & 0xffffffff != checksum:
-            raise DBMChecksumError("Corrupt data detected: invalid checksum.")
-        return checksum_data[10:]
+    def _verify_checksum_data(self, key, data):
+        # key is the bytes of the key,
+        # data is the bytes of the value + 4 byte checksum at the end.
+        value = data[:-4]
+        expected = struct.unpack('!I', data[-4:])[0]
+        actual = crc32(key)
+        actual = crc32(value, actual)
+        if actual & 0xffffffff != expected:
+            raise DBMChecksumError(
+                "Corrupt data detected: invalid checksum for key %s" % key)
+        return value
 
     def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write,
-                    str_type=_str_type):
+                    str_type=_str_type, pack=struct.pack, bytearray=bytearray,
+                    isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
         if isinstance(value, str_type):
             value = value.encode('utf-8')
         # Write the new data out at the end of the file.
         # Format is
-        # <checksum><keysize>:<key><valsize>:<val>
-        # Length of value plus 10 byte checksum.
-        value_length = len(value) + 10
+        # 4 bytes   4bytes              4bytes
+        # <keysize><valsize><key><val><keyvalcksum>
         # Everything except for the actual checksum + value
-        pre_value_blob = bytearray()
-        pre_value_blob.extend(("%s:" % len(key)).encode('utf-8'))
-        pre_value_blob.extend(key)
-        pre_value_blob.extend(("%s:" % value_length).encode('utf-8'))
-        pre_value_blob_size = len(pre_value_blob)
-        checksum = crc32(value) & 0xffffffff
-        pre_value_blob.extend(("%010d" % checksum).encode('utf-8'))
-        pre_value_blob.extend(value)
-        blob = pre_value_blob
+        key_size = len(key)
+        val_size = len(value)
+        blob = bytearray(pack('!ii', key_size, val_size))
+        keyval = bytearray(key)
+        keyval.extend(value)
+        blob.extend(keyval)
+        blob.extend(pack('!I', crc32(keyval) & 0xffffffff))
+
         write(self._data_fd, blob)
         # Update the in memory index.
-        self._index[key] = (self._current_offset + pre_value_blob_size,
-                            value_length)
+        self._index[key] = (self._current_offset + 8 + key_size,
+                            val_size)
         self._current_offset += len(blob)
 
     def __contains__(self, key):
         return key in self._index
 
     def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED,
-                    str_type=_str_type):
+                    str_type=_str_type, isinstance=isinstance,
+                    bytearray=bytearray, crc32=crc32, pack=struct.pack):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
-        # When the data blog is _DELETED:
-        # this indicates the key was deleted.
-        blob = bytearray()
-        blob.extend(('%s:' % len(key)).encode('utf-8'))
+        blob = bytearray(pack('!ii', len(key), _DELETED))
         blob.extend(key)
-        blob.extend(('%s:Z' % deleted).encode('utf-8'))
+        crc = pack('!I', crc32(key) & 0xffffffff)
+        blob.extend(crc)
+
         write(self._data_fd, blob)
         del self._index[key]
         self._current_offset += len(blob)
@@ -337,16 +344,15 @@ class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
             self._data_map = mmap.mmap(self._data_fd, 0,
                                        access=mmap.ACCESS_READ)
 
-    def __getitem__(self, key, str_type=_str_type):
+    def __getitem__(self, key, str_type=_str_type, isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
         offset, size = self._index[key]
-        checksum_data = self._data_map[offset:offset+size]
         if not self._verify_checksums:
-            data = checksum_data[10:]
+            return self._data_map[offset:offset+size]
         else:
-            data = self._verify_checksum_data(checksum_data)
-        return data
+            data = self._data_map[offset:offset+size+4]
+            return self._verify_checksum_data(key, data)
 
     def close(self, compact=False):
         super(_SemiDBMReadOnlyMMap, self).close()

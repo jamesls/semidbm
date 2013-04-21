@@ -350,19 +350,15 @@ class TestReadOnlyMode(SemiDBMTest):
 
     def test_checksum_failure(self):
         db = semidbm.open(self.dbdir, 'c')
-        db['key'] = 'value'
+        db[b'key'] = b'value'
         db.close()
-        # Change the first digit of the checksum data.
-        data_file = self.open_data_file(mode='r')
-        # 3:key15:<checksum>value
-        # First checksum digit is 9 bytes into the file.
-        beginning = data_file.read()
-        new_digit = int(beginning[8]) + 1
+        data_file = self.open_data_file(mode='rb')
+        contents = data_file.read()
         data_file.close()
-        data_file = self.open_data_file(mode='w')
-        data_file.write(beginning[:8])
-        data_file.write(str(new_digit))
-        data_file.write(beginning[9:])
+        # Changing 'value' to 'Value' should cause a checksum failure.
+        contents = contents.replace(b'value', b'Value')
+        data_file = self.open_data_file(mode='wb')
+        data_file.write(contents)
         data_file.close()
         db = self.open_db_file(verify_checksums=True)
         with self.assertRaises(semidbm.DBMChecksumError):
@@ -443,6 +439,15 @@ class TestWindowsSemidbm(TestSemiDBM):
     def tearDown(self):
         super(TestWindowsSemidbm, self).tearDown()
         sys.platform = self.original_platform
+
+
+class TestWithChecksumsOn(TestSemiDBM):
+    def open_db_file(self, **kwargs):
+        # If they do not explicitly set verify_checksums
+        # to something, default to it being on.
+        if 'verify_checksums' not in kwargs:
+            kwargs['verify_checksums'] = True
+        return semidbm.open(self.dbdir, 'c', **kwargs)
 
 
 if __name__ == '__main__':
