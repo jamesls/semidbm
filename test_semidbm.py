@@ -4,6 +4,7 @@ import os
 import sys
 import mmap
 import shutil
+import struct
 import tempfile
 try:
     import unittest2 as unittest
@@ -31,18 +32,6 @@ class SemiDBMTest(unittest.TestCase):
             os.makedirs(dbdir)
         data_filename = os.path.join(dbdir, 'data')
         return open(data_filename, mode=mode)
-
-    def open_index_file(self, dbdir=None, mode='r'):
-        """Given a dbdir, return a fileobj of the index file.
-
-        The dbdir will be created if needed.
-        """
-        if dbdir is None:
-            dbdir = self.dbdir
-        if not os.path.exists(dbdir):
-            os.makedirs(dbdir)
-        index_filename = os.path.join(dbdir, 'data.idx')
-        return open(index_filename, mode=mode)
 
 
 class TestSemiDBM(SemiDBMTest):
@@ -170,7 +159,6 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(set(db), set([b'one', b'two', b'three']))
         db.close()
 
-
     def test_sync_contents(self):
         # So there's not really a good way to test this, so
         # I'm just making sure you can call it, and you can see the data.
@@ -236,7 +224,8 @@ class TestSemiDBM(SemiDBMTest):
         db['key'] = 'original'
         del db['key']
         db.close(compact=True)
-        self.assertEqual(len(open(db._data_filename).read()), 0)
+        # Header is 8 bytes.
+        self.assertEqual(len(open(db._data_filename).read()), 8)
 
     def test_compact_then_write_data(self):
         db = self.open_db_file()
@@ -249,6 +238,28 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertEqual(db2['after'], b'after')
         db2.close()
+
+
+class TestSignatureMismatch(SemiDBMTest):
+    def test_bad_magic_number(self):
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        with self.open_data_file(mode='rb+') as f:
+            f.seek(0)
+            f.write(b'Z')
+        # Opening the db file should now fail.
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
+
+    def test_incompatible_version_number(self):
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        with self.open_data_file(mode='rb+') as f:
+            f.seek(4)
+            f.write(struct.pack('!H', 2))
+        # Opening the db file should now fail.
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
 
 
 class TestRemapping(SemiDBMTest):
@@ -350,19 +361,15 @@ class TestReadOnlyMode(SemiDBMTest):
 
     def test_checksum_failure(self):
         db = semidbm.open(self.dbdir, 'c')
-        db['key'] = 'value'
+        db[b'key'] = b'value'
         db.close()
-        # Change the first digit of the checksum data.
-        data_file = self.open_data_file(mode='r')
-        # 3:key15:<checksum>value
-        # First checksum digit is 9 bytes into the file.
-        beginning = data_file.read()
-        new_digit = int(beginning[8]) + 1
+        data_file = self.open_data_file(mode='rb')
+        contents = data_file.read()
         data_file.close()
-        data_file = self.open_data_file(mode='w')
-        data_file.write(beginning[:8])
-        data_file.write(str(new_digit))
-        data_file.write(beginning[9:])
+        # Changing 'value' to 'Value' should cause a checksum failure.
+        contents = contents.replace(b'value', b'Value')
+        data_file = self.open_data_file(mode='wb')
+        data_file.write(contents)
         data_file.close()
         db = self.open_db_file(verify_checksums=True)
         with self.assertRaises(semidbm.DBMChecksumError):
@@ -396,7 +403,6 @@ class TestReadOnlyModeMMapped(TestReadOnlyMode):
 
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):
-        self.open_index_file(mode='w')
         self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
 
     def test_when_data_file_does_not_exist(self):
@@ -443,6 +449,15 @@ class TestWindowsSemidbm(TestSemiDBM):
     def tearDown(self):
         super(TestWindowsSemidbm, self).tearDown()
         sys.platform = self.original_platform
+
+
+class TestWithChecksumsOn(TestSemiDBM):
+    def open_db_file(self, **kwargs):
+        # If they do not explicitly set verify_checksums
+        # to something, default to it being on.
+        if 'verify_checksums' not in kwargs:
+            kwargs['verify_checksums'] = True
+        return semidbm.open(self.dbdir, 'c', **kwargs)
 
 
 if __name__ == '__main__':
