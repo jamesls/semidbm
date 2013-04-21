@@ -33,18 +33,6 @@ class SemiDBMTest(unittest.TestCase):
         data_filename = os.path.join(dbdir, 'data')
         return open(data_filename, mode=mode)
 
-    def open_index_file(self, dbdir=None, mode='r'):
-        """Given a dbdir, return a fileobj of the index file.
-
-        The dbdir will be created if needed.
-        """
-        if dbdir is None:
-            dbdir = self.dbdir
-        if not os.path.exists(dbdir):
-            os.makedirs(dbdir)
-        index_filename = os.path.join(dbdir, 'data.idx')
-        return open(index_filename, mode=mode)
-
 
 class TestSemiDBM(SemiDBMTest):
     def test_insert_then_retrieve(self):
@@ -415,7 +403,6 @@ class TestReadOnlyModeMMapped(TestReadOnlyMode):
 
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):
-        self.open_index_file(mode='w')
         self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
 
     def test_when_data_file_does_not_exist(self):
