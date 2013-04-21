@@ -42,7 +42,7 @@ The semidbm header format consists of:
 
 * 4 byte magic number (``53 45 4d 49``)
 * 4 byte version number consisting of 2 byte major version and 2 byte
-  minor version.
+  minor version (currently (1, 1)).
 
 
 Entries
@@ -55,6 +55,6 @@ entries.  Each entry has this format:
 * 4 byte value size
 * Key contents
 * Value content
-* 4 byte checksum of Key + Value
+* 4 byte CRC32 checksum of Key + Value
 
 If a key is deleted it will have a value size of -1 and no value content.

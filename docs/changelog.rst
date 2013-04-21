@@ -5,9 +5,17 @@ Changelog
 0.4.0
 =====
 
-* Index and data file consolidated to a single file.
-* Checksums are written for all values.  Checksums can
+0.4.0 is a backwards incompatible release with 0.3.1.
+Data files created with 0.3.1 will not work with 0.4.0.
+The reasons for switching to 0.4.0 include:
+
+* Data format switched from ASCII to binary file format,
+  this resulted in a nice performance boost.
+* Index and data file consolidated to a single file, resulting
+  in improved write performance.
+* Checksums are written for all entries.  Checksums can
   be verified for every __getitem__ call (off by default).
+* Python 3 support (officially python 3.3.x).
 
 
 0.3.1
