@@ -4,6 +4,7 @@ import os
 import sys
 import mmap
 import shutil
+import struct
 import tempfile
 try:
     import unittest2 as unittest
@@ -170,7 +171,6 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(set(db), set([b'one', b'two', b'three']))
         db.close()
 
-
     def test_sync_contents(self):
         # So there's not really a good way to test this, so
         # I'm just making sure you can call it, and you can see the data.
@@ -236,7 +236,8 @@ class TestSemiDBM(SemiDBMTest):
         db['key'] = 'original'
         del db['key']
         db.close(compact=True)
-        self.assertEqual(len(open(db._data_filename).read()), 0)
+        # Header is 8 bytes.
+        self.assertEqual(len(open(db._data_filename).read()), 8)
 
     def test_compact_then_write_data(self):
         db = self.open_db_file()
@@ -249,6 +250,28 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertEqual(db2['after'], b'after')
         db2.close()
+
+
+class TestSignatureMismatch(SemiDBMTest):
+    def test_bad_magic_number(self):
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        with self.open_data_file(mode='rb+') as f:
+            f.seek(0)
+            f.write(b'Z')
+        # Opening the db file should now fail.
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
+
+    def test_incompatible_version_number(self):
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        with self.open_data_file(mode='rb+') as f:
+            f.seek(4)
+            f.write(struct.pack('!H', 2))
+        # Opening the db file should now fail.
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
 
 
 class TestRemapping(SemiDBMTest):

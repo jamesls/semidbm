@@ -22,8 +22,12 @@ except NameError:
     _str_type = str
 
 __version__ = '0.4.0'
-_open = __builtin__.open
+# Major, Minor version.
+FILE_FORMAT_VERSION = (1, 1)
+FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 
+
+_open = __builtin__.open
 _DELETED = -1
 _MAPPED_LOAD_PAGES = 300
 
@@ -38,26 +42,6 @@ class DBMLoadError(DBMError):
 
 class DBMChecksumError(DBMError):
     pass
-
-
-# The basic idea is to have a single data file which data is only ever
-# appended to.  The basic format is:
-#
-# <size>:key<size>:<checksum><value>
-#
-# For example, the key value pair "key: value" would be stored as:
-#
-#     3:key15:0494360628value
-#
-# When the data file is loaded, an index of key -> (offset, size)
-# is created.  So if the above line was the only key in the db, the
-# index would be:
-#
-#     {'key': (8, 15)}
-#
-# Which says that the value of key is located at offset 8 with a size of
-# 15 (this is the value + sizeof checksum). The checksum is always a 10
-# digit integer.
 
 
 class _SemiDBM(object):
@@ -95,12 +79,20 @@ class _SemiDBM(object):
     def _load_index(self, filename):
         # This method is only used upon instantiation to populate
         # the in memory index.
-        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+        if not os.path.exists(filename):
+            self._write_headers(filename)
             return {}
         try:
             return self._load_index_from_fileobj(filename)
         except ValueError as e:
             raise DBMLoadError("Bad index file %s: %s" % (filename, e))
+
+    def _write_headers(self, filename):
+        with _open(filename, 'wb') as f:
+            # Magic number identifier.
+            f.write(FILE_IDENTIFIER)
+            # File version format.
+            f.write(struct.pack('!HH', *FILE_FORMAT_VERSION))
 
     def _load_index_from_fileobj(self, filename):
         index = {}
@@ -122,7 +114,9 @@ class _SemiDBM(object):
 
     def _read_index(self, filename):
         # yields keyname, offset, size
-        f = _open(filename, 'r')
+        f = _open(filename, 'rb')
+        header = f.read(8)
+        self._verify_header(header)
         contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         remap_size = mmap.ALLOCATIONGRANULARITY * _MAPPED_LOAD_PAGES
         # We need to track the max_index to use as the upper bound
@@ -136,7 +130,7 @@ class _SemiDBM(object):
         # See http://bugs.python.org/issue10916 for more info.
         max_index = os.path.getsize(filename)
         num_resizes = 0
-        current = 0
+        current = 8
         try:
             while current != max_index:
                 key_size, val_size = struct.unpack(
@@ -163,6 +157,16 @@ class _SemiDBM(object):
         finally:
             contents.close()
             f.close()
+
+    def _verify_header(self, header):
+        sig = header[:4]
+        if sig != FILE_IDENTIFIER:
+            raise DBMLoadError("File is not a semibdm db file.")
+        major, minor = struct.unpack('!HH', header[4:])
+        if major != FILE_FORMAT_VERSION[0]:
+            raise DBMLoadError(
+                'Incompatible file version (got: v%s, can handle: v%s)' % (
+                    (major, FILE_FORMAT_VERSION[0])))
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
                     seek_set=os.SEEK_SET, str_type=_str_type,
