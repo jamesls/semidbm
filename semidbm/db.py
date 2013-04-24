@@ -209,8 +209,7 @@ class _SemiDBM(object):
         key_size = len(key)
         val_size = len(value)
         blob = bytearray(pack('!ii', key_size, val_size))
-        keyval = bytearray(key)
-        keyval.extend(value)
+        keyval = bytes(key + value)
         blob.extend(keyval)
         blob.extend(pack('!I', crc32(keyval) & 0xffffffff))
 
