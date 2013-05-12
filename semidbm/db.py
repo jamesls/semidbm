@@ -306,6 +306,7 @@ class _SemiDBM(object):
         new_db = self.__class__(os.path.join(self._dbdir, 'compact'))
         for key in self._index:
             new_db[key] = self[key]
+        new_db.sync()
         new_db.close()
         os.close(self._data_fd)
         self._renamer(new_db._data_filename, self._data_filename)
