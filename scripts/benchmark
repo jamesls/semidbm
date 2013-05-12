@@ -15,6 +15,7 @@ import json
 import shutil
 import optparse
 import time
+import string
 import tempfile
 import random
 import traceback
@@ -32,6 +33,11 @@ _potential_dbms = ['dbhash', 'dbm', 'gdbm', 'dumbdbm', 'semidbm']
 ADAPTER_DIR = os.path.join(os.path.dirname(__file__), 'adapters')
 sys.path.append(ADAPTER_DIR)
 out = sys.stdout.write
+
+
+def _rand_key(key_length, chars=string.printable):
+    return bytes(bytearray(''.join(random.choice(chars) for i in
+                                   _range(key_length))))
 
 
 def set_dbms(dbms):
@@ -105,15 +111,17 @@ class Benchmarks(object):
         out("Generating random data.\n")
         c = chr
         rand = random.randint
-        return bytes([rand(0, 255) for i in _range(string_size)])
+        r = bytes(bytearray([rand(0, 255) for i in _range(string_size)]))
+        return r
 
     def run(self, dbm):
         print("Benchmarking:", dbm)
         print(self.options.print_options())
         all_reports = []
         try:
-            for name in ['fill_sequential', 'read_cold', 'read_sequential',
-                         'read_hot', 'read_random', 'delete_sequential']:
+            for name in ['fill_random', 'fill_sequential', 'read_cold',
+                         'read_sequential', 'read_hot', 'read_random',
+                         'delete_sequential']:
                 method = getattr(self, name)
                 report = method(dbm)
                 report.print_report()
@@ -122,6 +130,35 @@ class Benchmarks(object):
             self.delete_dbm()
             print
         return all_reports
+
+    def fill_random(self, dbm):
+        db = self._load_dbm(dbm)
+        random_values = self.random_values
+        maxlen = len(random_values)
+        position = 0
+        value_size = self.options.value_size_bytes
+        key_size = self.options.key_size_bytes
+        num_keys = self.options.num_keys
+        indices = [_rand_key(key_size) for i in _range(num_keys)]
+
+        t = time.time
+        out = sys.stdout.write
+        flush = sys.stdout.flush
+        start = t()
+        for i in _range(num_keys):
+            db[indices[i]] = random_values[position:position+value_size]
+            position += value_size
+            if position + value_size > maxlen:
+                position = 0
+                out("(%s/%s)\r" % (i, num_keys))
+                flush()
+        total = t() - start
+        self._close_db(db)
+        self.delete_dbm()
+        return StatsReporter(
+            'fill_random', total,
+            (value_size * num_keys) + (self.options.key_size_bytes * num_keys),
+            num_keys)
 
     def fill_sequential(self, dbm):
         db = self._load_dbm(dbm)
