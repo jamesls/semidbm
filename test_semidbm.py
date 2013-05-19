@@ -270,16 +270,16 @@ class TestRemapping(SemiDBMTest):
         # as much data.  The logic in the code uses this constant, so changing
         # the value of the constant won't affect the code logic, it'll just
         # make the test run faster.
-        semidbm._MAPPED_LOAD_PAGES = 1
+        semidbm.db._MAPPED_LOAD_PAGES = 1
 
     def tearDown(self):
         super(TestRemapping, self).tearDown()
-        semidbm._MAPPED_LOAD_PAGES = self.original
+        semidbm.db._MAPPED_LOAD_PAGES = self.original
 
     def test_remap_required(self):
         # Verify the loading buffer logic works.  This is
         # really slow.
-        size = semidbm._MAPPED_LOAD_PAGES * mmap.ALLOCATIONGRANULARITY * 4
+        size = semidbm.db._MAPPED_LOAD_PAGES * mmap.ALLOCATIONGRANULARITY * 4
         db = self.open_db_file()
         # 100 byte values.
         values = b'abcd' * 25
