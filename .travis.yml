@@ -5,10 +5,11 @@ python:
   - "3.3"
 install:
   - if [[ $TRAVIS_PYTHON_VERSION == '2.6' ]]; then pip install --use-mirrors unittest2; fi
-  - pip install coverage
+  - pip install coverage coveralls --use-mirrors
 script:
   - coverage erase
   - coverage run --source semidbm test_semidbm.py
 notifications:
   email:
     - js@jamesls.com
+after_success: coveralls
