@@ -281,17 +281,17 @@ class TestSignatureMismatch(SemiDBMTest):
         db.close()
         # This is implementation specific, but we're going to read the raw data
         # file and truncate it.
-        with self.open_data_file(mode='r') as f:
+        with self.open_data_file(mode='rb') as f:
             contents = f.read()
             filename = f.name
             original_size = os.path.getsize(filename)
-        with self.open_data_file(mode='w') as f2:
+        with self.open_data_file(mode='wb') as f2:
             # Simulate the last 100 bytes missing.
             f2.write(contents[:-100])
         db2 = self.open_db_file()
-        self.assertEquals(db2['foobar'], 'foobar')
-        self.assertEquals(db2['key'], 'value')
-        self.assertEquals(db2['key2'], 'value2')
+        self.assertEquals(db2['foobar'], b'foobar')
+        self.assertEquals(db2['key'], b'value')
+        self.assertEquals(db2['key2'], b'value2')
         # But largevalue is not there, we recovered and just removed it.
         self.assertNotIn('largevalue', db2)
         # And when we compact the data file, the junk data
