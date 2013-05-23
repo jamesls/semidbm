@@ -129,18 +129,21 @@ class _SemiDBM(object):
         # a bus error (python2.7 works fine without this workaround).
         # See http://bugs.python.org/issue10916 for more info.
         max_index = os.path.getsize(filename)
+        file_size_bytes = max_index
         num_resizes = 0
         current = 8
         try:
             while current != max_index:
                 key_size, val_size = struct.unpack(
                     '!ii', contents[current:current+8])
-                #if key_index == -1:
-                #    break
                 key = contents[current+8:current+8+key_size]
-                yield (key,
-                       (remap_size * num_resizes) + current + 8 + key_size,
-                       val_size)
+                offset = (remap_size * num_resizes) + current + 8 + key_size
+                if offset + val_size > file_size_bytes:
+                    # If this happens then the index is telling us
+                    # to read past the end of the file.  What we need
+                    # to do is stop reading from the index.
+                    return
+                yield (key, offset, val_size)
                 if val_size == _DELETED:
                     val_size = 0
                 # Also need to skip past the 4 byte checksum, hence

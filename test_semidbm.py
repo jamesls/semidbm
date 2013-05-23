@@ -261,6 +261,42 @@ class TestSignatureMismatch(SemiDBMTest):
         # Opening the db file should now fail.
         self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
 
+    def test_recover_from_last_failed_write(self):
+        # Testing this scenario:
+        # - we're writing a large object, we write the entry
+        # header properly but we crash so we don't write out the
+        # full value.  The next time the db is loaded we should
+        # be able to recover from this situation.
+        db = self.open_db_file()
+        # First write a few good keys.
+        db['foobar'] = 'foobar'
+        db['key'] = 'value'
+        db['key2'] = 'value2'
+        # Now simulate a failing write.
+        db['largevalue'] = 'foobarbaz' * 1024
+        db.close()
+        # This is implementation specific, but we're going to read the raw data
+        # file and truncate it.
+        with self.open_data_file(mode='r') as f:
+            contents = f.read()
+            filename = f.name
+            original_size = os.path.getsize(filename)
+        with self.open_data_file(mode='w') as f2:
+            # Simulate the last 100 bytes missing.
+            f2.write(contents[:-100])
+        db2 = self.open_db_file()
+        self.assertEquals(db2['foobar'], 'foobar')
+        self.assertEquals(db2['key'], 'value')
+        self.assertEquals(db2['key2'], 'value2')
+        # But largevalue is not there, we recovered and just removed it.
+        self.assertNotIn('largevalue', db2)
+        # And when we compact the data file, the junk data
+        # is ignored and not written to the new file.
+        db2.compact()
+        db2.close()
+        new_size = os.path.getsize(filename)
+        self.assertTrue(new_size < original_size)
+
 
 class TestRemapping(SemiDBMTest):
     def setUp(self):
