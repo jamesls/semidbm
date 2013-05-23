@@ -11,7 +11,7 @@ setup(
     license='BSD',
     author='James Saryerwinnie',
     author_email='jlsnpi@gmail.com',
-    py_modules=['semidbm'],
+    packages = find_packages(),
     zip_safe=False,
     keywords="semidbm",
     url="https://github.com/jamesls/semidbm",
