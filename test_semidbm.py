@@ -134,6 +134,7 @@ class TestSemiDBM(SemiDBMTest):
         db2 = self.open_db_file()
         self.assertTrue('foo' not in db2)
         self.assertEqual(db2['bar'], b'bar')
+        db2.close()
 
     def test_keys_method(self):
         db = self.open_db_file()
@@ -150,6 +151,7 @@ class TestSemiDBM(SemiDBMTest):
         db['three'] = 'three_value'
         self.assertEqual(set(db.values()), set([b'one_value', b'two_value',
                                                 b'three_value']))
+        db.close()
 
     def test_iterate(self):
         db = self.open_db_file()
@@ -191,6 +193,7 @@ class TestSemiDBM(SemiDBMTest):
         db['two'] = b'two'
 
         self.assertEqual(db['two'], b'two')
+        db.close()
 
     def test_mixed_updates_and_deletes(self):
         db = self.open_db_file()
@@ -204,6 +207,7 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db['one'], b'one')
         self.assertEqual(db['two'], b'two')
         self.assertEqual(db['three'], b'three')
+        db.close()
 
     def test_compact_and_retrieve_data(self):
         db = self.open_db_file()
@@ -326,6 +330,7 @@ class TestRemapping(SemiDBMTest):
         db2 = self.open_db_file()
         for k in db2:
             self.assertEqual(db2[k], values)
+        db2.close()
 
 
 class TestReadOnlyMode(SemiDBMTest):
@@ -410,18 +415,22 @@ class TestReadOnlyMode(SemiDBMTest):
         db = self.open_db_file(verify_checksums=True)
         with self.assertRaises(semidbm.DBMChecksumError):
             db['key']
+        db.close()
         # If checksums are not enabled, an exception is not raised.
         db = self.open_db_file(verify_checksums=False)
         try:
             db['key']
         except semidbm.DBMChecksumError:
             self.fail("Checksums were suppose to be disabled.")
+        finally:
+            db.close()
 
     def test_unicode_chars(self):
         db = semidbm.open(self.dbdir, 'c')
         # cafe with the e-accute.
         db[b'caf\xc3\xa9'] = b'caf\xc3\xa9'
         self.assertEqual(db[b'caf\xc3\xa9'], b'caf\xc3\xa9')
+        db.close()
 
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
