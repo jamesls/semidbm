@@ -30,6 +30,13 @@ FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 _open = __builtin__.open
 _DELETED = -1
 _MAPPED_LOAD_PAGES = 300
+_WRITE_OPEN_FLAGS = None
+_DATA_OPEN_FLAGS = os.O_RDWR|os.O_CREAT|os.O_APPEND
+if sys.platform.startswith('win'):
+    # On windows we need to specify that we should be
+    # reading the file as a binary file so it doesn't
+    # change any line ending characters.
+    _DATA_OPEN_FLAGS = _DATA_OPEN_FLAGS|os.O_BINARY
 
 
 class DBMError(Exception):
@@ -72,8 +79,7 @@ class _SemiDBM(object):
     def _load_db(self):
         self._create_db_dir()
         self._index = self._load_index(self._data_filename)
-        self._data_fd = os.open(self._data_filename,
-                                 os.O_RDWR|os.O_CREAT|os.O_APPEND)
+        self._data_fd = os.open(self._data_filename, _DATA_OPEN_FLAGS)
         self._current_offset = os.lseek(self._data_fd, 0, os.SEEK_END)
 
     def _load_index(self, filename):
