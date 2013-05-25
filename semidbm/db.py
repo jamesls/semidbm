@@ -302,9 +302,6 @@ class _SemiDBM(object):
         As a general rule of thumb, the more non read updates you do,
         the more space you'll save when you compact.
 
-        Note that by default, the index is always compacted everytime
-        the db is opened, but not the data file.
-
         """
         # Basically, compaction works by opening a new db, writing
         # all the keys from this db to the new db, renaming the
