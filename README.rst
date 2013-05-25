@@ -33,6 +33,11 @@ A design goal of semidbm is to remain a pure python dbm.  This makes
 installation easy and allows semidbm to be used on any platform that
 supports python.
 
+Supported Python Versions
+=========================
+
+Semidbm supports python 2.6, 2.7, and 3.3.
+
 =============
 Official Docs
 =============
@@ -59,10 +64,9 @@ data written to the file is never modified.
 Data File Compaction
 ====================
 
-Semidbm uses a similar (but not identical) append only file format.  This has
-the potential to grow to large sizes as space is never reclaimed.  Semidbm
-addresses this by adding a ``compact()`` method that will rewrite the
-data file to a minimal size.
+Semidbm uses an append only file format.  This has the potential to grow to
+large sizes as space is never reclaimed.  Semidbm addresses this by adding a
+``compact()`` method that will rewrite the data file to a minimal size.
 
 
 Performance
