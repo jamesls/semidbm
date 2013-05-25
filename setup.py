@@ -16,7 +16,10 @@ setup(
     keywords="semidbm",
     url="https://github.com/jamesls/semidbm",
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.3',
         'License :: OSI Approved :: BSD License',
     ],
 )
