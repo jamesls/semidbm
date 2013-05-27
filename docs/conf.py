@@ -80,42 +80,48 @@ exclude_patterns = ['_build']
 # output. They are ignored by default.
 #show_authors = False
 
-# The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
 
 # -- Options for HTML output ---------------------------------------------------
+import guzzle_sphinx_theme
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-html_theme = 'default'
+# The name of the Pygments (syntax highlighting) style to use.
+pygments_style = 'guzzle_sphinx_theme.GuzzleStyle'
+html_translator_class = 'guzzle_sphinx_theme.HTMLTranslator'
+html_theme_path = guzzle_sphinx_theme.html_theme_path()
+html_theme = 'guzzle_sphinx_theme'
+html_theme_options = {
 
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#html_theme_options = {}
+    # Set the path to a special layout to include for the homepage
+    #"index_template": "special_index.html",
 
-# Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+    # Set the name of the project to appear in the nav menu
+    "project_nav_name": "SemiDBM",
 
-# The name for this set of Sphinx documents.  If None, it defaults to
-# "<project> v<release> documentation".
-#html_title = None
+    # Set your GitHub user and repo to enable GitHub stars links
+    "github_user": "jamesls",
+    "github_repo": "semidbm",
 
-# A shorter title for the navigation bar.  Default is the same as html_title.
-#html_short_title = None
+    # Set your Disqus short name to enable comments
+    #"disqus_comments_shortname": "my_disqus_comments_short_name",
 
-# The name of an image file (relative to this directory) to place at the top
-# of the sidebar.
-#html_logo = None
+    # Set you GA account ID to enable tracking
+    #"google_analytics_account": "my_ga_account",
 
-# The name of an image file (within the static path) to use as favicon of the
-# docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
-# pixels large.
-#html_favicon = None
+    # Set a custom class to add to the navbar (e.g. navbar-inverse)
+    "navbar_class": "",
+
+    # Path to a touch icon
+    "touch_icon": "",
+
+    # Set to true to bind left and right key events to turn the page
+    "bind_key_events": 1
+}
+
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
