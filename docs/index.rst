@@ -45,6 +45,7 @@ Contents
     :maxdepth: 2
 
     overview
+    details
     benchmarks
     changelog
 
