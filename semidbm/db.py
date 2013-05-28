@@ -158,9 +158,16 @@ class _SemiDBM(object):
                 if current >= remap_size:
                     contents.close()
                     num_resizes += 1
-                    contents = mmap.mmap(f.fileno(), 0,
+                    offset = num_resizes * remap_size
+                    # Windows python2.6 bug.  You can't specify a length of
+                    # 0 with an offset, otherwise you get a WindowsError, not
+                    # enough storage is available to process this command.
+                    # Couldn't find an issue for this, but the workaround
+                    # is to specify the actual length of the mmap'd region
+                    # which is the total size minus the offset we want.
+                    contents = mmap.mmap(f.fileno(), file_size_bytes - offset,
                                          access=mmap.ACCESS_READ,
-                                         offset=num_resizes * remap_size)
+                                         offset=offset)
                     current -= remap_size
                     max_index -= remap_size
         finally:
