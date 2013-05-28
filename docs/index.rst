@@ -38,8 +38,8 @@ Post feedback and issues on
 latest changes at the github `repo <https://github.com/jamesls/semidbm>`_.
 
 
-Contents
---------
+Topics
+------
 
 .. toctree::
     :maxdepth: 2
