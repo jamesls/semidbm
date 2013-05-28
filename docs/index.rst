@@ -23,7 +23,8 @@ It was written with these things in mind:
   This of course make installation more complicated, requires that
   the OS you're using has the shared library installed, requires
   that you have the necessary setup to build a C extension for python
-  (unless you want to use a binary package).
+  (unless you want to use a binary package).  Semidbm supports python
+  2.6, python 2.7, and python 3.3.
 * Cross platform.  Because semidbm is written in python, it runs
   on any platform that supports python.  The file format used for
   semidbm is also cross platform.

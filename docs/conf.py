@@ -87,7 +87,7 @@ exclude_patterns = ['_build']
 
 
 # -- Options for HTML output ---------------------------------------------------
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '_themes'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '_themes'))
 import guzzle_sphinx_theme
 
 # The name of the Pygments (syntax highlighting) style to use.
