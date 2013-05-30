@@ -10,7 +10,7 @@ setup(
                                        'README.rst')).read(),
     license='BSD',
     author='James Saryerwinnie',
-    author_email='jlsnpi@gmail.com',
+    author_email='js@jamesls.com',
     packages = find_packages(),
     zip_safe=False,
     keywords="semidbm",
