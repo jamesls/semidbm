@@ -305,8 +305,9 @@ class TestSignatureMismatch(SemiDBMTest):
 
 class TestRemapping(SemiDBMTest):
     def setUp(self):
+        import semidbm.loaders.mmapload
         super(TestRemapping, self).setUp()
-        self.original = semidbm.db._MAPPED_LOAD_PAGES
+        self.original = semidbm.loaders.mmapload._MAPPED_LOAD_PAGES
         # Change the number of mapped pages to 1 so that we don't have to write
         # as much data.  The logic in the code uses this constant, so changing
         # the value of the constant won't affect the code logic, it'll just
@@ -315,7 +316,7 @@ class TestRemapping(SemiDBMTest):
 
     def tearDown(self):
         super(TestRemapping, self).tearDown()
-        semidbm.db._MAPPED_LOAD_PAGES = self.original
+        semidbm.loaders.mmapload._MAPPED_LOAD_PAGES = self.original
 
     def test_remap_required(self):
         # Verify the loading buffer logic works.  This is

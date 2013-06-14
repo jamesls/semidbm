@@ -1,3 +1,14 @@
+import struct
+
+
+from semidbm.exceptions import DBMLoadError
+
+
+FILE_FORMAT_VERSION = (1, 1)
+FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
+_DELETED = -1
+
+
 class DBMLoader(object):
     def __init__(self):
         pass
@@ -16,3 +27,14 @@ class DBMLoader(object):
         is the size of the value in bytes.
         """
         raise NotImplementedError("iter_keys")
+
+    def _verify_header(self, header):
+        sig = header[:4]
+        if sig != FILE_IDENTIFIER:
+            raise DBMLoadError("File is not a semibdm db file.")
+        major, minor = struct.unpack('!HH', header[4:])
+        if major != FILE_FORMAT_VERSION[0]:
+            raise DBMLoadError(
+                'Incompatible file version (got: v%s, can handle: v%s)' % (
+                    (major, FILE_FORMAT_VERSION[0])))
+

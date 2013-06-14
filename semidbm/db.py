@@ -8,18 +8,22 @@ problems.
 """
 import os
 import sys
-import mmap
 from binascii import crc32
 import struct
 try:
     import __builtin__
 except ImportError:
     import builtins as __builtin__
+
+from semidbm.exceptions import DBMLoadError, DBMChecksumError, DBMError
+from semidbm.loaders import _DELETED
+
 try:
     _str_type = unicode
 except NameError:
     # Python 3.x.
     _str_type = str
+
 
 __version__ = '0.4.0'
 # Major, Minor version.
@@ -28,27 +32,12 @@ FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 
 
 _open = __builtin__.open
-_DELETED = -1
-_MAPPED_LOAD_PAGES = 300
-_WRITE_OPEN_FLAGS = None
 _DATA_OPEN_FLAGS = os.O_RDWR|os.O_CREAT|os.O_APPEND
 if sys.platform.startswith('win'):
     # On windows we need to specify that we should be
     # reading the file as a binary file so it doesn't
     # change any line ending characters.
     _DATA_OPEN_FLAGS = _DATA_OPEN_FLAGS|os.O_BINARY
-
-
-class DBMError(Exception):
-    pass
-
-
-class DBMLoadError(DBMError):
-    pass
-
-
-class DBMChecksumError(DBMError):
-    pass
 
 
 class _SemiDBM(object):
@@ -108,7 +97,7 @@ class _SemiDBM(object):
 
     def _load_index_from_fileobj(self, filename):
         index = {}
-        for key_name, offset, size in self._read_index(filename):
+        for key_name, offset, size in self._data_loader.iter_keys(filename):
             size = int(size)
             offset = int(offset)
             if size == _DELETED:
@@ -123,72 +112,6 @@ class _SemiDBM(object):
                 else:
                     index[key_name] = (offset, size)
         return index
-
-    def _read_index(self, filename):
-        # yields keyname, offset, size
-        f = _open(filename, 'rb')
-        header = f.read(8)
-        self._verify_header(header)
-        contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        remap_size = mmap.ALLOCATIONGRANULARITY * _MAPPED_LOAD_PAGES
-        # We need to track the max_index to use as the upper bound
-        # in the .find() calls to be compatible with python 2.6.
-        # There's a bug in python 2.6 where if an offset is specified
-        # along with a size of 0, then the size for mmap() is the size
-        # of the file instead of the size of the file - offset.  To
-        # fix this, we track this ourself and make sure we never go passed
-        # max_index.  If we don't do this, python2.6 will crash with
-        # a bus error (python2.7 works fine without this workaround).
-        # See http://bugs.python.org/issue10916 for more info.
-        max_index = os.path.getsize(filename)
-        file_size_bytes = max_index
-        num_resizes = 0
-        current = 8
-        try:
-            while current != max_index:
-                key_size, val_size = struct.unpack(
-                    '!ii', contents[current:current+8])
-                key = contents[current+8:current+8+key_size]
-                offset = (remap_size * num_resizes) + current + 8 + key_size
-                if offset + val_size > file_size_bytes:
-                    # If this happens then the index is telling us
-                    # to read past the end of the file.  What we need
-                    # to do is stop reading from the index.
-                    return
-                yield (key, offset, val_size)
-                if val_size == _DELETED:
-                    val_size = 0
-                # Also need to skip past the 4 byte checksum, hence
-                # the '+ 4' at the end
-                current = current + 8 + key_size + val_size + 4
-                if current >= remap_size:
-                    contents.close()
-                    num_resizes += 1
-                    offset = num_resizes * remap_size
-                    # Windows python2.6 bug.  You can't specify a length of
-                    # 0 with an offset, otherwise you get a WindowsError, not
-                    # enough storage is available to process this command.
-                    # Couldn't find an issue for this, but the workaround
-                    # is to specify the actual length of the mmap'd region
-                    # which is the total size minus the offset we want.
-                    contents = mmap.mmap(f.fileno(), file_size_bytes - offset,
-                                         access=mmap.ACCESS_READ,
-                                         offset=offset)
-                    current -= remap_size
-                    max_index -= remap_size
-        finally:
-            contents.close()
-            f.close()
-
-    def _verify_header(self, header):
-        sig = header[:4]
-        if sig != FILE_IDENTIFIER:
-            raise DBMLoadError("File is not a semibdm db file.")
-        major, minor = struct.unpack('!HH', header[4:])
-        if major != FILE_FORMAT_VERSION[0]:
-            raise DBMLoadError(
-                'Incompatible file version (got: v%s, can handle: v%s)' % (
-                    (major, FILE_FORMAT_VERSION[0])))
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
                     seek_set=os.SEEK_SET, str_type=_str_type,

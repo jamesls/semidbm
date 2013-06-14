@@ -7,12 +7,11 @@ except ImportError:
     import builtins as __builtin__
 
 
-from semidbm.loaders import DBMLoader
+from semidbm.loaders import DBMLoader, _DELETED
 
 
 _open = __builtin__.open
 _MAPPED_LOAD_PAGES = 300
-_DELETED = -1
 
 
 class MMapLoader(DBMLoader):
