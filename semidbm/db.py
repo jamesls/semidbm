@@ -355,35 +355,6 @@ class _SemiDBMReadOnly(_SemiDBM):
         os.close(self._data_fd)
 
 
-class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
-    def __init__(self, dbdir, **kwargs):
-        self._data_map = None
-        super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, **kwargs)
-
-    def _load_db(self):
-        self._create_db_dir()
-        self._index = self._load_index(self._data_filename)
-        self._data_fd = os.open(self._data_filename, os.O_RDONLY|os.O_CREAT)
-        if os.path.getsize(self._data_filename) > 0:
-            self._data_map = mmap.mmap(self._data_fd, 0,
-                                       access=mmap.ACCESS_READ)
-
-    def __getitem__(self, key, str_type=_str_type, isinstance=isinstance):
-        if isinstance(key, str_type):
-            key = key.encode('utf-8')
-        offset, size = self._index[key]
-        if not self._verify_checksums:
-            return self._data_map[offset:offset+size]
-        else:
-            data = self._data_map[offset:offset+size+4]
-            return self._verify_checksum_data(key, data)
-
-    def close(self, compact=False):
-        super(_SemiDBMReadOnlyMMap, self).close()
-        if self._data_map is not None:
-            self._data_map.close()
-
-
 class _SemiDBMReadWrite(_SemiDBM):
     def _load_db(self):
         if not os.path.isfile(self._data_filename):

@@ -434,20 +434,6 @@ class TestReadOnlyMode(SemiDBMTest):
         db.close()
 
 
-class TestReadOnlyModeMMapped(TestReadOnlyMode):
-    def open_db_file(self, **kwargs):
-        return semidbm.db._SemiDBMReadOnlyMMap(
-            self.dbdir, data_loader=MMapLoader(), **kwargs)
-
-    def test_load_empty_db(self):
-        db = semidbm.open(self.dbdir, 'c')
-        db.close()
-        empty_db = self.open_db_file()
-        keys = empty_db.keys()
-        empty_db.close()
-        self.assertEqual(list(keys), [])
-
-
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):
         self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
