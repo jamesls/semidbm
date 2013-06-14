@@ -58,11 +58,17 @@ class _SemiDBM(object):
         does not exist it will be created.
 
     """
-    def __init__(self, dbdir, renamer=None, verify_checksums=False):
+    def __init__(self, dbdir, renamer=None, verify_checksums=False,
+                 data_loader=None):
         if renamer is None:
             self._renamer = _Renamer()
         else:
             self._renamer = renamer
+        if data_loader is None:
+            # TODO: handle me
+            raise Exception("Handle this case!")
+        else:
+            self._data_loader = data_loader
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
         # The in memory index, mapping of key to (offset, size).
@@ -316,7 +322,8 @@ class _SemiDBM(object):
         # reopening the files associated with this db.  This
         # implementation can certainly be more efficient, but compaction
         # is really slow anyways.
-        new_db = self.__class__(os.path.join(self._dbdir, 'compact'))
+        new_db = self.__class__(os.path.join(self._dbdir, 'compact'),
+                                data_loader=self._data_loader)
         for key in self._index:
             new_db[key] = self[key]
         new_db.sync()
@@ -461,7 +468,14 @@ def open(filename, flag='r', mode=0o666, verify_checksums=False):
         renamer = _WindowsRenamer()
     else:
         renamer = _Renamer()
-    kwargs = {'renamer': renamer, 'verify_checksums': verify_checksums}
+    if sys.platform.startswith('java'):
+        # TODO: handle me
+        raise Exception("Handle me")
+    else:
+        from semidbm.loaders.mmapload import MMapLoader
+        data_loader = MMapLoader()
+    kwargs = {'renamer': renamer, 'verify_checksums': verify_checksums,
+              'data_loader': data_loader}
     if flag == 'r':
         return _SemiDBMReadOnly(filename, **kwargs)
     elif flag == 'c':

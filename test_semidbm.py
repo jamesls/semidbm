@@ -12,6 +12,7 @@ except ImportError:
     import unittest
 
 import semidbm
+from semidbm.loaders.mmapload import MMapLoader
 
 
 class SemiDBMTest(unittest.TestCase):
@@ -435,7 +436,8 @@ class TestReadOnlyMode(SemiDBMTest):
 
 class TestReadOnlyModeMMapped(TestReadOnlyMode):
     def open_db_file(self, **kwargs):
-        return semidbm.db._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
+        return semidbm.db._SemiDBMReadOnlyMMap(
+            self.dbdir, data_loader=MMapLoader(), **kwargs)
 
     def test_load_empty_db(self):
         db = semidbm.open(self.dbdir, 'c')
