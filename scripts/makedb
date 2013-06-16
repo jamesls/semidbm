@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+# Time the time to load a semidbm db.
+import sys
+import random
+import string
+from argparse import ArgumentParser
+import tempfile
+import os
+
+import semidbm
+
+
+try:
+    _range = xrange
+except NameError:
+    _range = range
+
+
+def _rand_bytes(key_length, chars=string.printable):
+    return bytes(bytearray(''.join(random.choice(chars) for i in
+                                   _range(key_length))))
+
+
+def populate_db(args):
+    path = args.output_dir
+    db = semidbm.open(path, 'c')
+    sys.stdout.write("Populating the DB...\n")
+    sys.stdout.write("  - num_keys: %s\n" % args.num_keys)
+    sys.stdout.write("  - key_size_bytes: %s\n" % args.key_size_bytes)
+    sys.stdout.write("  - val_size_bytes: %s\n" % args.value_size_bytes)
+    sys.stdout.flush()
+    key_size_bytes = args.key_size_bytes
+    value_size_bytes = args.value_size_bytes
+    for i in range(args.num_keys):
+        db[_rand_bytes(key_size_bytes)] = _rand_bytes(value_size_bytes)
+    sys.stdout.write("\nDone")
+    db.close()
+
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument('-n', '--num-keys', default=1000000, type=int)
+    parser.add_argument('-k', '--key-size-bytes', default=16, type=int)
+    parser.add_argument('-s', '--value-size-bytes', default=100, type=int)
+    parser.add_argument('output_dir', help="Location of db to create.")
+
+    args = parser.parse_args()
+    populate_db(args)
+
+
+if __name__ == '__main__':
+    main()
