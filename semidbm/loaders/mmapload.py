@@ -8,6 +8,7 @@ except ImportError:
 
 
 from semidbm.loaders import DBMLoader, _DELETED
+from semidbm.exceptions import DBMLoadError
 
 
 _open = __builtin__.open
@@ -40,9 +41,14 @@ class MMapLoader(DBMLoader):
         current = 8
         try:
             while current != max_index:
-                key_size, val_size = struct.unpack(
-                    '!ii', contents[current:current+8])
+                try:
+                    key_size, val_size = struct.unpack(
+                        '!ii', contents[current:current+8])
+                except struct.error:
+                    raise DBMLoadError()
                 key = contents[current+8:current+8+key_size]
+                if len(key) != key_size:
+                    raise DBMLoadError()
                 offset = (remap_size * num_resizes) + current + 8 + key_size
                 if offset + val_size > file_size_bytes:
                     # If this happens then the index is telling us

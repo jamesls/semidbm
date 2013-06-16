@@ -35,6 +35,13 @@ class SemiDBMTest(unittest.TestCase):
         data_filename = os.path.join(dbdir, 'data')
         return open(data_filename, mode=mode)
 
+    def truncate_data_file(self, bytes_from_end):
+        with self.open_data_file(mode='rb') as f:
+            contents = f.read()
+        with self.open_data_file(mode='wb') as f2:
+            # Simulate the last bytes_from_end bytes missing.
+            f2.write(contents[:-bytes_from_end])
+
 
 class TestSemiDBM(SemiDBMTest):
     def test_insert_then_retrieve(self):
@@ -245,8 +252,6 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db2['after'], b'after')
         db2.close()
 
-
-class TestSignatureMismatch(SemiDBMTest):
     def test_bad_magic_number(self):
         db = self.open_db_file()
         db['foo'] = 'bar'
@@ -284,12 +289,9 @@ class TestSignatureMismatch(SemiDBMTest):
         # This is implementation specific, but we're going to read the raw data
         # file and truncate it.
         with self.open_data_file(mode='rb') as f:
-            contents = f.read()
             filename = f.name
             original_size = os.path.getsize(filename)
-        with self.open_data_file(mode='wb') as f2:
-            # Simulate the last 100 bytes missing.
-            f2.write(contents[:-100])
+        self.truncate_data_file(bytes_from_end=100)
         db2 = self.open_db_file()
         self.assertEquals(db2['foobar'], b'foobar')
         self.assertEquals(db2['key'], b'value')
@@ -302,6 +304,35 @@ class TestSignatureMismatch(SemiDBMTest):
         db2.close()
         new_size = os.path.getsize(filename)
         self.assertTrue(new_size < original_size)
+
+    def test_file_thats_truncated(self):
+        # Let's say that the file header is fine, but part
+        # of the header for an individual record has been
+        # trunated.
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        # Now let's truncate the file to only 10 bytes which
+        # will include the file header and part of an entry
+        # header.
+        with self.open_data_file(mode='rb') as f:
+            contents = f.read()
+        with self.open_data_file(mode='wb') as f2:
+            f2.write(contents[:10])
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
+
+    def test_key_size_says_to_read_past_end_of_file(self):
+        # We can create this situation by creating an entry
+        # and truncating the key/value part.
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        # From the end we have a 4 byte checksum + 3 bytes for
+        # the key and 3 bytes for the value, or a total of
+        # 10 bytes.  We'll chop off 8 which means we're missing
+        # the checksum, the value, and one byte of the key.
+        self.truncate_data_file(bytes_from_end=8)
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
 
 
 class TestRemapping(SemiDBMTest):
@@ -493,6 +524,7 @@ class TestWithChecksumsOn(TestSemiDBM):
         if 'verify_checksums' not in kwargs:
             kwargs['verify_checksums'] = True
         return semidbm.open(self.dbdir, 'c', **kwargs)
+
 
 class TestSimpleFileLoader(TestSemiDBM):
     def open_db_file(self, **kwargs):
