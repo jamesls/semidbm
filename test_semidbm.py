@@ -13,6 +13,7 @@ except ImportError:
 
 import semidbm
 from semidbm.loaders.mmapload import MMapLoader
+from semidbm.loaders.simpleload import SimpleFileLoader
 
 
 class SemiDBMTest(unittest.TestCase):
@@ -492,6 +493,11 @@ class TestWithChecksumsOn(TestSemiDBM):
         if 'verify_checksums' not in kwargs:
             kwargs['verify_checksums'] = True
         return semidbm.open(self.dbdir, 'c', **kwargs)
+
+class TestSimpleFileLoader(TestSemiDBM):
+    def open_db_file(self, **kwargs):
+        kwargs['data_loader'] = SimpleFileLoader()
+        return semidbm.db._SemiDBM(self.dbdir, **kwargs)
 
 
 if __name__ == '__main__':
