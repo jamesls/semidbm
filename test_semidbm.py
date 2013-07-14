@@ -12,7 +12,6 @@ except ImportError:
     import unittest
 
 import semidbm
-from semidbm.loaders.mmapload import MMapLoader
 from semidbm.loaders.simpleload import SimpleFileLoader
 
 

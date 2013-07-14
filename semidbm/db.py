@@ -363,8 +363,8 @@ def open(filename, flag='r', mode=0o666, verify_checksums=False):
     else:
         renamer = _Renamer()
     if sys.platform.startswith('java'):
-        # TODO: handle me
-        raise Exception("Handle me")
+        from semidbm.loaders.simpleload import SimpleFileLoader
+        data_loader = SimpleFileLoader()
     else:
         from semidbm.loaders.mmapload import MMapLoader
         data_loader = MMapLoader()
