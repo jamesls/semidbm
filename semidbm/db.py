@@ -140,7 +140,7 @@ class _SemiDBM(object):
         return value
 
     def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write,
-                    str_type=_str_type, pack=struct.pack, bytearray=bytearray,
+                    str_type=_str_type, pack=struct.pack,
                     isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
@@ -153,10 +153,10 @@ class _SemiDBM(object):
         # Everything except for the actual checksum + value
         key_size = len(key)
         val_size = len(value)
-        blob = bytearray(pack('!ii', key_size, val_size))
-        keyval = bytes(key + value)
-        blob.extend(keyval)
-        blob.extend(pack('!I', crc32(keyval) & 0xffffffff))
+        keyval_size = pack('!ii', key_size, val_size)
+        keyval = key + value
+        checksum = pack('!I', crc32(keyval) & 0xffffffff)
+        blob = keyval_size + keyval + checksum
 
         write(self._data_fd, blob)
         # Update the in memory index.
@@ -169,13 +169,12 @@ class _SemiDBM(object):
 
     def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED,
                     str_type=_str_type, isinstance=isinstance,
-                    bytearray=bytearray, crc32=crc32, pack=struct.pack):
+                    crc32=crc32, pack=struct.pack):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
-        blob = bytearray(pack('!ii', len(key), _DELETED))
-        blob.extend(key)
+        key_size = pack('!ii', len(key), _DELETED)
         crc = pack('!I', crc32(key) & 0xffffffff)
-        blob.extend(crc)
+        blob = key_size + key + crc
 
         write(self._data_fd, blob)
         del self._index[key]
