@@ -510,19 +510,6 @@ class TestInvalidModeArgument(unittest.TestCase):
         self.assertRaises(ValueError, semidbm.open, 'foo.db', 'z')
 
 
-class TestWindowsSemidbm(TestSemiDBM):
-    def setUp(self):
-        super(TestWindowsSemidbm, self).setUp()
-        self.original_platform = sys.platform
-        # The win32 specific code is compatible with posix platforms,
-        # so these tests can run on mac/linux/etc. just fine.
-        sys.platform = 'win32'
-
-    def tearDown(self):
-        super(TestWindowsSemidbm, self).tearDown()
-        sys.platform = self.original_platform
-
-
 class TestWithChecksumsOn(TestSemiDBM):
     def open_db_file(self, **kwargs):
         # If they do not explicitly set verify_checksums

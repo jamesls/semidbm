@@ -291,9 +291,8 @@ class _WindowsRenamer(object):
         # os.rename(from_, to) will fail is the to file exists,
         # so in order to accommodate this, the to_file is renamed,
         # then from_file -> to_file, and then to_file is removed.
-        os.rename(to_file, to_file + os.extsep + 'tmprename')
-        os.rename(from_file, to_file)
-        os.remove(to_file + os.extsep + 'tmprename')
+        import semidbm.win32
+        semidbm.win32.rename(from_file, to_file)
 
 
 def _create_default_params(**starting_kwargs):
