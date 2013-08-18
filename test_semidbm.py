@@ -2,16 +2,21 @@
 
 import os
 import sys
-import mmap
 import shutil
 import struct
 import tempfile
+try:
+    import mmap
+except ImportError:
+    mmap = None
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
 
 import semidbm
+import semidbm.db
+from semidbm.loaders.simpleload import SimpleFileLoader
 
 
 class SemiDBMTest(unittest.TestCase):
@@ -32,6 +37,13 @@ class SemiDBMTest(unittest.TestCase):
             os.makedirs(dbdir)
         data_filename = os.path.join(dbdir, 'data')
         return open(data_filename, mode=mode)
+
+    def truncate_data_file(self, bytes_from_end):
+        with self.open_data_file(mode='rb') as f:
+            contents = f.read()
+        with self.open_data_file(mode='wb') as f2:
+            # Simulate the last bytes_from_end bytes missing.
+            f2.write(contents[:-bytes_from_end])
 
 
 class TestSemiDBM(SemiDBMTest):
@@ -243,8 +255,6 @@ class TestSemiDBM(SemiDBMTest):
         self.assertEqual(db2['after'], b'after')
         db2.close()
 
-
-class TestSignatureMismatch(SemiDBMTest):
     def test_bad_magic_number(self):
         db = self.open_db_file()
         db['foo'] = 'bar'
@@ -282,12 +292,9 @@ class TestSignatureMismatch(SemiDBMTest):
         # This is implementation specific, but we're going to read the raw data
         # file and truncate it.
         with self.open_data_file(mode='rb') as f:
-            contents = f.read()
             filename = f.name
             original_size = os.path.getsize(filename)
-        with self.open_data_file(mode='wb') as f2:
-            # Simulate the last 100 bytes missing.
-            f2.write(contents[:-100])
+        self.truncate_data_file(bytes_from_end=100)
         db2 = self.open_db_file()
         self.assertEquals(db2['foobar'], b'foobar')
         self.assertEquals(db2['key'], b'value')
@@ -301,25 +308,58 @@ class TestSignatureMismatch(SemiDBMTest):
         new_size = os.path.getsize(filename)
         self.assertTrue(new_size < original_size)
 
+    def test_file_thats_truncated(self):
+        # Let's say that the file header is fine, but part
+        # of the header for an individual record has been
+        # trunated.
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        # Now let's truncate the file to only 10 bytes which
+        # will include the file header and part of an entry
+        # header.
+        with self.open_data_file(mode='rb') as f:
+            contents = f.read()
+        with self.open_data_file(mode='wb') as f2:
+            f2.write(contents[:10])
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
 
+    def test_key_size_says_to_read_past_end_of_file(self):
+        # We can create this situation by creating an entry
+        # and truncating the key/value part.
+        db = self.open_db_file()
+        db['foo'] = 'bar'
+        db.close()
+        # From the end we have a 4 byte checksum + 3 bytes for
+        # the key and 3 bytes for the value, or a total of
+        # 10 bytes.  We'll chop off 8 which means we're missing
+        # the checksum, the value, and one byte of the key.
+        self.truncate_data_file(bytes_from_end=8)
+        self.assertRaises(semidbm.DBMLoadError, self.open_db_file)
+
+
+@unittest.skipIf(mmap is None, 'mmap required')
 class TestRemapping(SemiDBMTest):
     def setUp(self):
+        import semidbm.loaders.mmapload
         super(TestRemapping, self).setUp()
-        self.original = semidbm.db._MAPPED_LOAD_PAGES
+        self.original = semidbm.loaders.mmapload._MAPPED_LOAD_PAGES
         # Change the number of mapped pages to 1 so that we don't have to write
         # as much data.  The logic in the code uses this constant, so changing
         # the value of the constant won't affect the code logic, it'll just
         # make the test run faster.
-        semidbm.db._MAPPED_LOAD_PAGES = 1
+        semidbm.loaders.mmapload._MAPPED_LOAD_PAGES = 1
 
     def tearDown(self):
         super(TestRemapping, self).tearDown()
-        semidbm.db._MAPPED_LOAD_PAGES = self.original
+        semidbm.loaders.mmapload._MAPPED_LOAD_PAGES = self.original
 
     def test_remap_required(self):
         # Verify the loading buffer logic works.  This is
         # really slow.
-        size = semidbm.db._MAPPED_LOAD_PAGES * mmap.ALLOCATIONGRANULARITY * 4
+        size = (
+            semidbm.loaders.mmapload._MAPPED_LOAD_PAGES *
+            mmap.ALLOCATIONGRANULARITY * 4)
         db = self.open_db_file()
         # 100 byte values.
         values = b'abcd' * 25
@@ -433,19 +473,6 @@ class TestReadOnlyMode(SemiDBMTest):
         db.close()
 
 
-class TestReadOnlyModeMMapped(TestReadOnlyMode):
-    def open_db_file(self, **kwargs):
-        return semidbm.db._SemiDBMReadOnlyMMap(self.dbdir, **kwargs)
-
-    def test_load_empty_db(self):
-        db = semidbm.open(self.dbdir, 'c')
-        db.close()
-        empty_db = self.open_db_file()
-        keys = empty_db.keys()
-        empty_db.close()
-        self.assertEqual(list(keys), [])
-
-
 class TestWriteMode(SemiDBMTest):
     def test_when_index_file_does_not_exist(self):
         self.assertRaises(semidbm.DBMError, semidbm.open, self.dbdir, 'w')
@@ -503,6 +530,13 @@ class TestWithChecksumsOn(TestSemiDBM):
         if 'verify_checksums' not in kwargs:
             kwargs['verify_checksums'] = True
         return semidbm.open(self.dbdir, 'c', **kwargs)
+
+
+class TestSimpleFileLoader(TestSemiDBM):
+    def open_db_file(self, **kwargs):
+        kwargs = semidbm.db._create_default_params()
+        kwargs['data_loader'] = SimpleFileLoader()
+        return semidbm.db._SemiDBM(self.dbdir, **kwargs)
 
 
 if __name__ == '__main__':

@@ -8,18 +8,22 @@ problems.
 """
 import os
 import sys
-import mmap
 from binascii import crc32
 import struct
 try:
     import __builtin__
 except ImportError:
     import builtins as __builtin__
+
+from semidbm.exceptions import DBMLoadError, DBMChecksumError, DBMError
+from semidbm.loaders import _DELETED
+
 try:
     _str_type = unicode
 except NameError:
     # Python 3.x.
     _str_type = str
+
 
 __version__ = '0.4.0'
 # Major, Minor version.
@@ -28,27 +32,12 @@ FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 
 
 _open = __builtin__.open
-_DELETED = -1
-_MAPPED_LOAD_PAGES = 300
-_WRITE_OPEN_FLAGS = None
 _DATA_OPEN_FLAGS = os.O_RDWR|os.O_CREAT|os.O_APPEND
 if sys.platform.startswith('win'):
     # On windows we need to specify that we should be
     # reading the file as a binary file so it doesn't
     # change any line ending characters.
     _DATA_OPEN_FLAGS = _DATA_OPEN_FLAGS|os.O_BINARY
-
-
-class DBMError(Exception):
-    pass
-
-
-class DBMLoadError(DBMError):
-    pass
-
-
-class DBMChecksumError(DBMError):
-    pass
 
 
 class _SemiDBM(object):
@@ -58,11 +47,10 @@ class _SemiDBM(object):
         does not exist it will be created.
 
     """
-    def __init__(self, dbdir, renamer=None, verify_checksums=False):
-        if renamer is None:
-            self._renamer = _Renamer()
-        else:
-            self._renamer = renamer
+    def __init__(self, dbdir, renamer, data_loader=None,
+                 verify_checksums=False):
+        self._renamer = renamer
+        self._data_loader = data_loader
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
         # The in memory index, mapping of key to (offset, size).
@@ -102,7 +90,7 @@ class _SemiDBM(object):
 
     def _load_index_from_fileobj(self, filename):
         index = {}
-        for key_name, offset, size in self._read_index(filename):
+        for key_name, offset, size in self._data_loader.iter_keys(filename):
             size = int(size)
             offset = int(offset)
             if size == _DELETED:
@@ -117,72 +105,6 @@ class _SemiDBM(object):
                 else:
                     index[key_name] = (offset, size)
         return index
-
-    def _read_index(self, filename):
-        # yields keyname, offset, size
-        f = _open(filename, 'rb')
-        header = f.read(8)
-        self._verify_header(header)
-        contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        remap_size = mmap.ALLOCATIONGRANULARITY * _MAPPED_LOAD_PAGES
-        # We need to track the max_index to use as the upper bound
-        # in the .find() calls to be compatible with python 2.6.
-        # There's a bug in python 2.6 where if an offset is specified
-        # along with a size of 0, then the size for mmap() is the size
-        # of the file instead of the size of the file - offset.  To
-        # fix this, we track this ourself and make sure we never go passed
-        # max_index.  If we don't do this, python2.6 will crash with
-        # a bus error (python2.7 works fine without this workaround).
-        # See http://bugs.python.org/issue10916 for more info.
-        max_index = os.path.getsize(filename)
-        file_size_bytes = max_index
-        num_resizes = 0
-        current = 8
-        try:
-            while current != max_index:
-                key_size, val_size = struct.unpack(
-                    '!ii', contents[current:current+8])
-                key = contents[current+8:current+8+key_size]
-                offset = (remap_size * num_resizes) + current + 8 + key_size
-                if offset + val_size > file_size_bytes:
-                    # If this happens then the index is telling us
-                    # to read past the end of the file.  What we need
-                    # to do is stop reading from the index.
-                    return
-                yield (key, offset, val_size)
-                if val_size == _DELETED:
-                    val_size = 0
-                # Also need to skip past the 4 byte checksum, hence
-                # the '+ 4' at the end
-                current = current + 8 + key_size + val_size + 4
-                if current >= remap_size:
-                    contents.close()
-                    num_resizes += 1
-                    offset = num_resizes * remap_size
-                    # Windows python2.6 bug.  You can't specify a length of
-                    # 0 with an offset, otherwise you get a WindowsError, not
-                    # enough storage is available to process this command.
-                    # Couldn't find an issue for this, but the workaround
-                    # is to specify the actual length of the mmap'd region
-                    # which is the total size minus the offset we want.
-                    contents = mmap.mmap(f.fileno(), file_size_bytes - offset,
-                                         access=mmap.ACCESS_READ,
-                                         offset=offset)
-                    current -= remap_size
-                    max_index -= remap_size
-        finally:
-            contents.close()
-            f.close()
-
-    def _verify_header(self, header):
-        sig = header[:4]
-        if sig != FILE_IDENTIFIER:
-            raise DBMLoadError("File is not a semibdm db file.")
-        major, minor = struct.unpack('!HH', header[4:])
-        if major != FILE_FORMAT_VERSION[0]:
-            raise DBMLoadError(
-                'Incompatible file version (got: v%s, can handle: v%s)' % (
-                    (major, FILE_FORMAT_VERSION[0])))
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
                     seek_set=os.SEEK_SET, str_type=_str_type,
@@ -211,7 +133,7 @@ class _SemiDBM(object):
         return value
 
     def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write,
-                    str_type=_str_type, pack=struct.pack, bytearray=bytearray,
+                    str_type=_str_type, pack=struct.pack,
                     isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
@@ -224,10 +146,10 @@ class _SemiDBM(object):
         # Everything except for the actual checksum + value
         key_size = len(key)
         val_size = len(value)
-        blob = bytearray(pack('!ii', key_size, val_size))
-        keyval = bytes(key + value)
-        blob.extend(keyval)
-        blob.extend(pack('!I', crc32(keyval) & 0xffffffff))
+        keyval_size = pack('!ii', key_size, val_size)
+        keyval = key + value
+        checksum = pack('!I', crc32(keyval) & 0xffffffff)
+        blob = keyval_size + keyval + checksum
 
         write(self._data_fd, blob)
         # Update the in memory index.
@@ -240,13 +162,12 @@ class _SemiDBM(object):
 
     def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED,
                     str_type=_str_type, isinstance=isinstance,
-                    bytearray=bytearray, crc32=crc32, pack=struct.pack):
+                    crc32=crc32, pack=struct.pack):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
-        blob = bytearray(pack('!ii', len(key), _DELETED))
-        blob.extend(key)
+        key_size = pack('!ii', len(key), _DELETED)
         crc = pack('!I', crc32(key) & 0xffffffff)
-        blob.extend(crc)
+        blob = key_size + key + crc
 
         write(self._data_fd, blob)
         del self._index[key]
@@ -316,7 +237,9 @@ class _SemiDBM(object):
         # reopening the files associated with this db.  This
         # implementation can certainly be more efficient, but compaction
         # is really slow anyways.
-        new_db = self.__class__(os.path.join(self._dbdir, 'compact'))
+        new_db = self.__class__(os.path.join(self._dbdir, 'compact'),
+                                data_loader=self._data_loader,
+                                renamer=self._renamer)
         for key in self._index:
             new_db[key] = self[key]
         new_db.sync()
@@ -346,35 +269,6 @@ class _SemiDBMReadOnly(_SemiDBM):
 
     def close(self, compact=False):
         os.close(self._data_fd)
-
-
-class _SemiDBMReadOnlyMMap(_SemiDBMReadOnly):
-    def __init__(self, dbdir, **kwargs):
-        self._data_map = None
-        super(_SemiDBMReadOnlyMMap, self).__init__(dbdir, **kwargs)
-
-    def _load_db(self):
-        self._create_db_dir()
-        self._index = self._load_index(self._data_filename)
-        self._data_fd = os.open(self._data_filename, os.O_RDONLY|os.O_CREAT)
-        if os.path.getsize(self._data_filename) > 0:
-            self._data_map = mmap.mmap(self._data_fd, 0,
-                                       access=mmap.ACCESS_READ)
-
-    def __getitem__(self, key, str_type=_str_type, isinstance=isinstance):
-        if isinstance(key, str_type):
-            key = key.encode('utf-8')
-        offset, size = self._index[key]
-        if not self._verify_checksums:
-            return self._data_map[offset:offset+size]
-        else:
-            data = self._data_map[offset:offset+size+4]
-            return self._verify_checksum_data(key, data)
-
-    def close(self, compact=False):
-        super(_SemiDBMReadOnlyMMap, self).close()
-        if self._data_map is not None:
-            self._data_map.close()
 
 
 class _SemiDBMReadWrite(_SemiDBM):
@@ -419,6 +313,25 @@ class _WindowsRenamer(object):
         os.remove(to_file + os.extsep + 'tmprename')
 
 
+def _create_default_params(**starting_kwargs):
+    kwargs = starting_kwargs.copy()
+    # Internal method that creates the parameters based
+    # on the choices like platform/available features.
+    if sys.platform.startswith('win'):
+        renamer = _WindowsRenamer()
+    else:
+        renamer = _Renamer()
+    try:
+        from semidbm.loaders.mmapload import MMapLoader
+        data_loader = MMapLoader()
+    except ImportError:
+        # If mmap is not available then fall back to the
+        # simple non mmap based file loader.
+        from semidbm.loaders.simpleload import SimpleFileLoader
+        data_loader = SimpleFileLoader()
+    kwargs.update({'renamer': renamer, 'data_loader': data_loader})
+    return kwargs
+
 # The "dbm" interface is:
 #
 #     open(filename, flag='r', mode=0o666)
@@ -457,11 +370,7 @@ def open(filename, flag='r', mode=0o666, verify_checksums=False):
         are correct on every __getitem__ call (defaults to False).
 
     """
-    if sys.platform.startswith('win'):
-        renamer = _WindowsRenamer()
-    else:
-        renamer = _Renamer()
-    kwargs = {'renamer': renamer, 'verify_checksums': verify_checksums}
+    kwargs = _create_default_params(verify_checksums=verify_checksums)
     if flag == 'r':
         return _SemiDBMReadOnly(filename, **kwargs)
     elif flag == 'c':
