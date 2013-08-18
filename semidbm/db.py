@@ -47,17 +47,10 @@ class _SemiDBM(object):
         does not exist it will be created.
 
     """
-    def __init__(self, dbdir, renamer=None, verify_checksums=False,
-                 data_loader=None):
-        if renamer is None:
-            self._renamer = _Renamer()
-        else:
-            self._renamer = renamer
-        if data_loader is None:
-            # TODO: handle me
-            raise Exception("Handle this case!")
-        else:
-            self._data_loader = data_loader
+    def __init__(self, dbdir, renamer, data_loader=None,
+                 verify_checksums=False):
+        self._renamer = renamer
+        self._data_loader = data_loader
         self._dbdir = dbdir
         self._data_filename = os.path.join(dbdir, 'data')
         # The in memory index, mapping of key to (offset, size).
@@ -245,7 +238,8 @@ class _SemiDBM(object):
         # implementation can certainly be more efficient, but compaction
         # is really slow anyways.
         new_db = self.__class__(os.path.join(self._dbdir, 'compact'),
-                                data_loader=self._data_loader)
+                                data_loader=self._data_loader,
+                                renamer=self._renamer)
         for key in self._index:
             new_db[key] = self[key]
         new_db.sync()
@@ -319,6 +313,23 @@ class _WindowsRenamer(object):
         os.remove(to_file + os.extsep + 'tmprename')
 
 
+def _create_default_params(**starting_kwargs):
+    kwargs = starting_kwargs.copy()
+    # Internal method that creates the parameters based
+    # on the choices like platform/available features.
+    if sys.platform.startswith('win'):
+        renamer = _WindowsRenamer()
+    else:
+        renamer = _Renamer()
+    if sys.platform.startswith('java'):
+        from semidbm.loaders.simpleload import SimpleFileLoader
+        data_loader = SimpleFileLoader()
+    else:
+        from semidbm.loaders.mmapload import MMapLoader
+        data_loader = MMapLoader()
+    kwargs.update({'renamer': renamer, 'data_loader': data_loader})
+    return kwargs
+
 # The "dbm" interface is:
 #
 #     open(filename, flag='r', mode=0o666)
@@ -357,18 +368,7 @@ def open(filename, flag='r', mode=0o666, verify_checksums=False):
         are correct on every __getitem__ call (defaults to False).
 
     """
-    if sys.platform.startswith('win'):
-        renamer = _WindowsRenamer()
-    else:
-        renamer = _Renamer()
-    if sys.platform.startswith('java'):
-        from semidbm.loaders.simpleload import SimpleFileLoader
-        data_loader = SimpleFileLoader()
-    else:
-        from semidbm.loaders.mmapload import MMapLoader
-        data_loader = MMapLoader()
-    kwargs = {'renamer': renamer, 'verify_checksums': verify_checksums,
-              'data_loader': data_loader}
+    kwargs = _create_default_params(verify_checksums=verify_checksums)
     if flag == 'r':
         return _SemiDBMReadOnly(filename, **kwargs)
     elif flag == 'c':

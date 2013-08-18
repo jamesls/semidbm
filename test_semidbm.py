@@ -15,6 +15,7 @@ except ImportError:
     import unittest
 
 import semidbm
+import semidbm.db
 from semidbm.loaders.simpleload import SimpleFileLoader
 
 
@@ -532,6 +533,7 @@ class TestWithChecksumsOn(TestSemiDBM):
 
 class TestSimpleFileLoader(TestSemiDBM):
     def open_db_file(self, **kwargs):
+        kwargs = semidbm.db._create_default_params()
         kwargs['data_loader'] = SimpleFileLoader()
         return semidbm.db._SemiDBM(self.dbdir, **kwargs)
 
