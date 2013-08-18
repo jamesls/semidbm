@@ -10,34 +10,17 @@ import os
 import sys
 from binascii import crc32
 import struct
-try:
-    import __builtin__
-except ImportError:
-    import builtins as __builtin__
 
 from semidbm.exceptions import DBMLoadError, DBMChecksumError, DBMError
 from semidbm.loaders import _DELETED
-
-try:
-    _str_type = unicode
-except NameError:
-    # Python 3.x.
-    _str_type = str
+from semidbm import compat
 
 
 __version__ = '0.4.0'
 # Major, Minor version.
 FILE_FORMAT_VERSION = (1, 1)
 FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
-
-
-_open = __builtin__.open
-_DATA_OPEN_FLAGS = os.O_RDWR|os.O_CREAT|os.O_APPEND
-if sys.platform.startswith('win'):
-    # On windows we need to specify that we should be
-    # reading the file as a binary file so it doesn't
-    # change any line ending characters.
-    _DATA_OPEN_FLAGS = _DATA_OPEN_FLAGS|os.O_BINARY
+_open = compat.file_open
 
 
 class _SemiDBM(object):
@@ -67,7 +50,7 @@ class _SemiDBM(object):
     def _load_db(self):
         self._create_db_dir()
         self._index = self._load_index(self._data_filename)
-        self._data_fd = os.open(self._data_filename, _DATA_OPEN_FLAGS)
+        self._data_fd = os.open(self._data_filename, compat.DATA_OPEN_FLAGS)
         self._current_offset = os.lseek(self._data_fd, 0, os.SEEK_END)
 
     def _load_index(self, filename):
@@ -107,7 +90,7 @@ class _SemiDBM(object):
         return index
 
     def __getitem__(self, key, read=os.read, lseek=os.lseek,
-                    seek_set=os.SEEK_SET, str_type=_str_type,
+                    seek_set=os.SEEK_SET, str_type=compat.str_type,
                     isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
@@ -133,7 +116,7 @@ class _SemiDBM(object):
         return value
 
     def __setitem__(self, key, value, len=len, crc32=crc32, write=os.write,
-                    str_type=_str_type, pack=struct.pack,
+                    str_type=compat.str_type, pack=struct.pack,
                     isinstance=isinstance):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
@@ -161,7 +144,7 @@ class _SemiDBM(object):
         return key in self._index
 
     def __delitem__(self, key, len=len, write=os.write, deleted=_DELETED,
-                    str_type=_str_type, isinstance=isinstance,
+                    str_type=compat.str_type, isinstance=isinstance,
                     crc32=crc32, pack=struct.pack):
         if isinstance(key, str_type):
             key = key.encode('utf-8')
@@ -331,6 +314,7 @@ def _create_default_params(**starting_kwargs):
         data_loader = SimpleFileLoader()
     kwargs.update({'renamer': renamer, 'data_loader': data_loader})
     return kwargs
+
 
 # The "dbm" interface is:
 #
