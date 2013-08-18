@@ -9,6 +9,8 @@ Changelog
   has not been available in a public interface since
   b265e60c5f4c0b1e8e9e4343f5f2300b5e017bf0 (1.5 years ago)
   so it's now removed.
+* Added non mmap based dbm loader for platforms that do not
+  support mmap.
 
 
 0.4.0
