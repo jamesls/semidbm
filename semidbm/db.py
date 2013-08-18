@@ -321,12 +321,14 @@ def _create_default_params(**starting_kwargs):
         renamer = _WindowsRenamer()
     else:
         renamer = _Renamer()
-    if sys.platform.startswith('java'):
-        from semidbm.loaders.simpleload import SimpleFileLoader
-        data_loader = SimpleFileLoader()
-    else:
+    try:
         from semidbm.loaders.mmapload import MMapLoader
         data_loader = MMapLoader()
+    except ImportError:
+        # If mmap is not available then fall back to the
+        # simple non mmap based file loader.
+        from semidbm.loaders.simpleload import SimpleFileLoader
+        data_loader = SimpleFileLoader()
     kwargs.update({'renamer': renamer, 'data_loader': data_loader})
     return kwargs
 
