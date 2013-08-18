@@ -1,17 +1,13 @@
 import os
 import mmap
 import struct
-try:
-    import __builtin__
-except ImportError:
-    import builtins as __builtin__
 
 
 from semidbm.loaders import DBMLoader, _DELETED
 from semidbm.exceptions import DBMLoadError
+from semidbm import compat
 
 
-_open = __builtin__.open
 _MAPPED_LOAD_PAGES = 300
 
 
@@ -21,7 +17,7 @@ class MMapLoader(DBMLoader):
 
     def iter_keys(self, filename):
         # yields keyname, offset, size
-        f = _open(filename, 'rb')
+        f = compat.file_open(filename, 'rb')
         header = f.read(8)
         self._verify_header(header)
         contents = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
