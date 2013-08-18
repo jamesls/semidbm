@@ -345,7 +345,8 @@ def open(filename, flag='r', mode=0o666, verify_checksums=False):
         this is actually a directory name.  The argument is named
         `filename` to be compatible with the dbm interface.
 
-    :param flag: Specifies how the db should be opened.  `flag` can be any of these values
+    :param flag: Specifies how the db should be opened.
+        `flag` can be any of these values:
 
         +---------+-------------------------------------------+
         | Value   | Meaning                                   |
