@@ -12,7 +12,9 @@ kernel32.ReplaceFile.argtypes = [
 def rename(src, dst):
     # Atomic renames in windows!
     # Equivalent to os.rename() in POSIX.
-    rc = kernel32.ReplaceFile(LPCTSTR(src), LPCTSTR(dst), None, 0, None, None)
+    # Yes the args here seem backwards but this is in fact
+    # the awesomeness of windows just being different.
+    rc = kernel32.ReplaceFile(LPCTSTR(dst), LPCTSTR(src), None, 0, None, None)
     if rc == 0:
         # While some sort of error is better than nothing,
         # I think there's a way to get a better error message
