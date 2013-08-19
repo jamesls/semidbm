@@ -11,6 +11,7 @@ Changelog
   so it's now removed.
 * Added non mmap based dbm loader for platforms that do not
   support mmap.
+* Atomic renames on windows during db compaction.
 
 
 0.4.0
