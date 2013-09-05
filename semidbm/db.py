@@ -288,9 +288,9 @@ class _Renamer(object):
 # Note that this also works on posix platforms as well.
 class _WindowsRenamer(object):
     def __call__(self, from_file, to_file):
-        # os.rename(from_, to) will fail is the to file exists,
-        # so in order to accommodate this, the to_file is renamed,
-        # then from_file -> to_file, and then to_file is removed.
+        # os.rename() does not work if the dst file exists
+        # on windows so we have to use our own version that
+        # supports atomic renames.
         import semidbm.win32
         semidbm.win32.rename(from_file, to_file)
 
