@@ -47,13 +47,6 @@ is renamed over the original data file, completing the compaction.
 This way, if a crash occurs during compaction, the original data file
 is not corrupted.
 
-.. warning::
-
-  In Windows, it is not possible to rename a file over an open file without
-  using the low level win32 API directly.  This can certainly be done, but
-  the workaround for now is (only on windows) to rename the current file
-  to a different filename, then to rename to new data file to the current
-  file name, and finally to delete the original data file.
 
 Reading Values
 ==============
