@@ -16,7 +16,6 @@ from semidbm.loaders import _DELETED
 from semidbm import compat
 
 
-__version__ = '0.4.0'
 # Major, Minor version.
 FILE_FORMAT_VERSION = (1, 1)
 FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
