@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='semidbm',
-    version='0.4.0',
+    version='0.5.0',
     description="Cross platform (fast) DBM interface in python",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.rst')).read(),
