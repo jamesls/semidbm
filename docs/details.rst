@@ -96,11 +96,3 @@ can take advantage of this optimized read only mode.  To open a db
 file as read only, use the ``'r'`` option::
 
     db = semidbm.open('dbname', 'r')
-
-When this happens, the data file is mmap'd. Instead of using an
-``lseek/read`` to retrieve data files, we can just return the contents
-directly::
-
-    return contents[offset:offset+size]
-
-This avoids a copying the contents to an additional buffer.
