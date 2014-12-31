@@ -9,34 +9,37 @@ Overview
    :target: https://coveralls.io/r/jamesls/semidbm?branch=master
 
 
-SemiDBM is an attempt at improving the dumbdbm in the python standard library.
-It's a slight improvement in both performance and in durability.  It can be
-used anywhere dumbdbm would be appropriate to use, which is basically when you
-have no other options available.  It uses a similar design to dumbdbm which
-means that it does inherit some of the same problems as dumbdbm, but it also
-attempts to fix problems in dumbdbm, which makes it only a semi-dumb dbm :)
-It supports a "dbm like" interface::
+Semidbm is a fast, pure python implementation of a dbm, which is a
+persistent key value store. It allows you to get and set keys through
+a dict interface::
 
     import semidbm
     db = semidbm.open('testdb', 'c')
     db['foo'] = 'bar'
     print db['foo']
-
     db.close()
+
+These values are persisted to disk, and you can later retrieve
+these key/value pairs::
+
     # Then at a later time:
     db = semidbm.open('testdb', 'r')
     # prints "bar"
     print db['foo']
 
 
-A design goal of semidbm is to remain a pure python dbm.  This makes
-installation easy and allows semidbm to be used on any platform that
-supports python.
+It was written with these things in mind:
+
+* Pure python, supporting python 2.6, 2.7, 3.3, and 3.4.
+* Cross platform, works on Windows, Linux, Mac OS X.
+* Supports CPython, pypy, and jython (versions 2.7-b3 and higher).
+* Simple and Fast (See `Benchmarking Semidbm <http://semidbm.readthedocs.org/en/latest/benchmarks.html>`__).
+
 
 Supported Python Versions
 =========================
 
-Semidbm supports python 2.6, 2.7, and 3.3.
+Semidbm supports python 2.6, 2.7, 3.3, and 3.4.
 
 =============
 Official Docs
@@ -46,11 +49,14 @@ Read the `semidbm docs <http://semidbm.readthedocs.org>`_ for more information
 and how to use semidbm.
 
 
-============
-Improvements
-============
+========
+Features
+========
 
-Below are a list of some of the improvements semidbm makes over dumbdbm.
+Semidbm originally started off as an improvement over the
+`dumbdbm <https://docs.python.org/2/library/dumbdbm.html>`__
+library in the python standard library.  Below are a list of some of the
+improvements over dumbdbm.
 
 
 Single Data File
