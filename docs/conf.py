@@ -23,6 +23,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
 
+on_rtd = os.environ.get('READTHEDOCS') == 'True'
+
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode']
@@ -87,40 +89,18 @@ exclude_patterns = ['_build']
 
 
 # -- Options for HTML output ---------------------------------------------------
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '_themes'))
-import guzzle_sphinx_theme
-
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'guzzle_sphinx_theme.GuzzleStyle'
-html_translator_class = 'guzzle_sphinx_theme.HTMLTranslator'
-html_theme_path = guzzle_sphinx_theme.html_theme_path()
-html_theme = 'guzzle_sphinx_theme'
+if not on_rtd:
+    try:
+        import sphinx_rtd_theme
+    except ImportError:
+        sys.stderr.write("Could not import sphinx_rtd_theme, you can "
+                         "run 'pip install sphinx_rtd_theme' to install "
+                         "this package.\n")
+        raise
+    html_theme = 'sphinx_rtd_theme'
+    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_theme_options = {
-
-    # Set the path to a special layout to include for the homepage
-    #"index_template": "special_index.html",
-
-    # Set the name of the project to appear in the nav menu
-    "project_nav_name": "SemiDBM",
-
-    # Set your GitHub user and repo to enable GitHub stars links
-    "github_user": "jamesls",
-    "github_repo": "semidbm",
-
-    # Set your Disqus short name to enable comments
-    #"disqus_comments_shortname": "my_disqus_comments_short_name",
-
-    # Set you GA account ID to enable tracking
-    #"google_analytics_account": "my_ga_account",
-
-    # Set a custom class to add to the navbar (e.g. navbar-inverse)
-    "navbar_class": "",
-
-    # Path to a touch icon
-    "touch_icon": "",
-
-    # Set to true to bind left and right key events to turn the page
-    "bind_key_events": 1
 }
 
 

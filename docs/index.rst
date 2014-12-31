@@ -1,15 +1,19 @@
 Semidbm
 =======
 
-semidbm is a pure python implementation of a dbm, which is essentially a
-persistent key value store. It allows you to get and set keys::
+Semidbm is a fast, pure python implementation of a dbm, which is a
+persistent key value store. It allows you to get and set keys through
+a dict interface::
 
     import semidbm
     db = semidbm.open('testdb', 'c')
     db['foo'] = 'bar'
     print db['foo']
-
     db.close()
+
+These values are persisted to disk, and you can later retrieve
+these key/value pairs::
+
     # Then at a later time:
     db = semidbm.open('testdb', 'r')
     # prints "bar"
@@ -18,25 +22,14 @@ persistent key value store. It allows you to get and set keys::
 
 It was written with these things in mind:
 
-* Pure python.  Many of the "standard" dbms are written in C,
-  which requires a C extension to give python code access to the dbm.
-  This of course make installation more complicated, requires that
-  the OS you're using has the shared library installed, requires
-  that you have the necessary setup to build a C extension for python
-  (unless you want to use a binary package).  Semidbm supports python
-  2.6, python 2.7, and python 3.3.
-* Cross platform.  Because semidbm is written in python, it runs
-  on any platform that supports python.  The file format used for
-  semidbm is also cross platform.
-* Simplicity.  The original design is based off of python's dumbdbm module
-  in the standard library, and one of the goals of semidbm is to try to keep
-  the design comparably simple.
-
+* Pure python, supporting python 2.6, 2.7, 3.3, and 3.4.
+* Cross platform, works on Windows, Linux, Mac OS X.
+* Simple and Fast (See :doc:`benchmarks`).
 
 
 Post feedback and issues on
 `github issues <https://github.com/jamesls/semidbm/issues>`_, or check out the
-latest changes at the github `repo <https://github.com/jamesls/semidbm>`_.
+latest changes at the `github repo <https://github.com/jamesls/semidbm>`_.
 
 
 Topics
