@@ -8,6 +8,26 @@ Overview
 .. image:: https://coveralls.io/repos/jamesls/semidbm/badge.png?branch=master
    :target: https://coveralls.io/r/jamesls/semidbm?branch=master
 
+.. image:: https://pypip.in/version/semidbm/badge.svg
+    :target: https://pypi.python.org/pypi/semidbm/
+    :alt: Latest Version
+
+.. image:: https://pypip.in/py_versions/semidbm/badge.svg
+    :target: https://pypi.python.org/pypi/semidbm/
+    :alt: Supported Python versions
+
+.. image:: https://pypip.in/implementation/semidbm/badge.svg
+    :target: https://pypi.python.org/pypi/semidbm/
+    :alt: Supported Python implementations
+
+.. image:: https://pypip.in/license/semidbm/badge.svg
+    :target: https://pypi.python.org/pypi/semidbm/
+    :alt: License
+
+.. image:: https://pypip.in/wheel/semidbm/badge.svg
+    :target: https://pypi.python.org/pypi/semidbm/
+    :alt: Wheel Status
+
 
 Semidbm is a fast, pure python implementation of a dbm, which is a
 persistent key value store. It allows you to get and set keys through
