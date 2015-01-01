@@ -2,6 +2,13 @@
 Changelog
 =========
 
+0.5.1
+=====
+
+* Remove unused code.
+* Add support for wheels.
+
+
 0.5.0
 =====
 
