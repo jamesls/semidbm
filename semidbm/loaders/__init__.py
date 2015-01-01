@@ -4,6 +4,7 @@ import struct
 from semidbm.exceptions import DBMLoadError
 
 
+# Major, Minor version.
 FILE_FORMAT_VERSION = (1, 1)
 FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 _DELETED = -1
@@ -37,4 +38,3 @@ class DBMLoader(object):
             raise DBMLoadError(
                 'Incompatible file version (got: v%s, can handle: v%s)' % (
                     (major, FILE_FORMAT_VERSION[0])))
-

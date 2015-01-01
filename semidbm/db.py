@@ -12,13 +12,10 @@ from binascii import crc32
 import struct
 
 from semidbm.exceptions import DBMLoadError, DBMChecksumError, DBMError
-from semidbm.loaders import _DELETED
+from semidbm.loaders import _DELETED, FILE_FORMAT_VERSION, FILE_IDENTIFIER
 from semidbm import compat
 
 
-# Major, Minor version.
-FILE_FORMAT_VERSION = (1, 1)
-FILE_IDENTIFIER = b'\x53\x45\x4d\x49'
 _open = compat.file_open
 
 
