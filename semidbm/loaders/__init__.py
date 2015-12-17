@@ -32,7 +32,7 @@ class DBMLoader(object):
     def _verify_header(self, header):
         sig = header[:4]
         if sig != FILE_IDENTIFIER:
-            raise DBMLoadError("File is not a semibdm db file.")
+            raise DBMLoadError("File is not a semidbm db file.")
         major, minor = struct.unpack('!HH', header[4:])
         if major != FILE_FORMAT_VERSION[0]:
             raise DBMLoadError(
